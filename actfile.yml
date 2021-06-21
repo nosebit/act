@@ -1,0 +1,6 @@
+version: 1
+
+acts:
+  install:
+    cmds:
+      - go install gitlab.com/nosebit/act
