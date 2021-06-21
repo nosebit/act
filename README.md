@@ -4,7 +4,7 @@ Act is a task runner and supervisor written in Go which aims to provide the foll
 
 * process supervision in a project level
 * allow tasks to be written as simple bash scripting if wanted
-* sub tasks which can be invoked like `act run cmd1 cmd2`
+* sub tasks which can be invoked with `act run foo.bar` where `bar` is a sub task of `foo` task (tasks are called acts here)
 * dynamically include tasks defined in other locations allowing spliting task definition
 * regex match task names
 
