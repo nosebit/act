@@ -240,6 +240,15 @@ var runCtx *ActRunCtx
 //############################################################
 
 /**
+ * This command going to generate an id from a name.
+ */
+func genId(name string) string {
+	hash := md5.Sum([]byte(name))
+
+	return hex.EncodeToString(hash[:])
+}
+
+/**
  * This function going to recursivelly traverse actfiles to
  * best match an act to be executed.
  *
@@ -513,9 +522,7 @@ func FindActRunCtx(actCallId string, actFile *actfile.ActFile) *ActRunCtx {
 		subActNamesChain = runCtx.ActName
 	}
 
-	hash := md5.Sum([]byte(fmt.Sprintf("%s:%s", runCtx.TailActFile.LocationPath, subActNamesChain)))
-
-	runCtx.ActId = hex.EncodeToString(hash[:])
+	runCtx.ActId = genId(fmt.Sprintf("%s:%s", runCtx.TailActFile.LocationPath, subActNamesChain))
 	runCtx.Act.Id = runCtx.ActId
 	runCtx.Act.CallId = actCallId
 	runCtx.ActDataDirPath = utils.GetActDataDirPath(runCtx.ActCallId)
@@ -525,6 +532,10 @@ func FindActRunCtx(actCallId string, actFile *actfile.ActFile) *ActRunCtx {
 
 /**
  * This function going to collect act commands.
+ *
+ * @param act - The act we want to build command lines map for.
+ * @param runCtx - The current run context.
+ * @param cmdLinesMap - Map of all command lines found so far grouped by acts.
  */
 func BuildCmdLinesMap(act *actfile.Act, runCtx *ActRunCtx, cmdLinesMap map[string][]string) {
 	var cmdLines []string
@@ -547,6 +558,11 @@ func BuildCmdLinesMap(act *actfile.Act, runCtx *ActRunCtx, cmdLinesMap map[strin
 			if _, ok := cmdLinesMap[newRunCtx.ActId]; !ok {
 				BuildCmdLinesMap(newRunCtx.Act, newRunCtx, cmdLinesMap)
 			}
+		}
+
+		if len(cmd.Args) > 0 {
+			args := strings.Join(cmd.Args, " ")
+			cmdLine = fmt.Sprintf("%s %s", cmdLine, args)
 		}
 
 		cmdLines = append(cmdLines, cmdLine)
@@ -704,8 +720,25 @@ func RunCmdExec(args []string, actFile *actfile.ActFile) {
 	 */
 	cmdLinesMap := make(map[string][]string)
 	var scriptLines []string
+	var beforeActId string
 
 	BuildCmdLinesMap(runCtx.Act, runCtx, cmdLinesMap)
+
+	/**
+	 * Process before commands
+	 */
+	if (runCtx.HeadActFile.Before != nil) {
+		beforeActId = genId(runCtx.HeadActFile.LocationPath)
+
+		beforeAct := actfile.Act{
+			Id: beforeActId,
+			CallId: "--before",
+			Name: "--before",
+			Cmds: runCtx.HeadActFile.Before,
+		}
+
+		BuildCmdLinesMap(&beforeAct, runCtx, cmdLinesMap)
+	}
 
 	// Build act script content.
 	for actId, cmdLines := range cmdLinesMap {
@@ -719,7 +752,13 @@ func RunCmdExec(args []string, actFile *actfile.ActFile) {
 		scriptLines = append(scriptLines, "")
 	}
 
-	scriptLines = append(scriptLines, fmt.Sprintf("act-%s", runCtx.ActId))
+	scriptLines = append(scriptLines, "shift # to remove first cli argument")
+
+	if beforeActId != "" {
+		scriptLines = append(scriptLines, fmt.Sprintf("act-%s", beforeActId))
+	}
+
+	scriptLines = append(scriptLines, fmt.Sprintf("act-%s $@", runCtx.ActId))
 
 	/**
 	 * Write all command lines to act script file (first removing
@@ -735,6 +774,9 @@ func RunCmdExec(args []string, actFile *actfile.ActFile) {
 	// Convert vars to a list of env vars to be used in act execution
 	envVars := utils.VarsMapToEnvVars(runCtx.Vars)
 
+	// Build shell command args
+	shCmdArgs := append([]string{actScriptFilePath}, cmdArgs...)
+
 	/**
 	 * Spawn the command to be executed.
 	 *
@@ -745,7 +787,7 @@ func RunCmdExec(args []string, actFile *actfile.ActFile) {
 	 * @TODO : I think we should use something like https://github.com/mvdan/sh
 	 * so we don't need to rely on local bash installed.
 	 */
-	shCmd := exec.Command("bash", actScriptFilePath)
+	shCmd := exec.Command("bash", shCmdArgs...)
 
 	/**
 	 * Set environment variables using all available env vars plus

@@ -45,7 +45,44 @@ and then we run the act with the following command:
 act run foo
 ```
 
-If we don't specify `cmds` in `actfile.yml` file for `foo` then act going to look up for a shell script file named `foo.sh` in `acts` folder and if that script file is found then act going to run it which allows very powerful acts. In other words we can have the following folder structure:
+If you need to specify a more powerful command you can use shell scripting directly in `cmds` field like this:
+
+```yaml
+# actfile.yml
+version: 1
+
+acts:
+  build-deps:
+    desc: This act going to build dependencies in a workspace and optionally clean everything before start.
+    cmds: |
+      echo "args=$@"
+
+      for i in "$@"; do
+        case $i in
+          --clean)
+          CLEAN="true"
+          shift # past argument=value
+          ;;
+        esac
+      done
+
+      if [ -n "$CLEAN" ]; then
+        echo "Running clean mode"
+        # First let's remove all sub node_modules
+        find . -name "node_modules" -type d -prune -exec rm -rf '{}' +
+      fi
+
+      # Now install dependencies
+      #
+      # We put yarn install inside a loop to get rid of an ENOENT error we were getting.
+      # Check this out: https://github.com/yarnpkg/yarn/issues/2629
+      yarn install --ignore-engines $@
+
+```
+
+Notice that acts can receive command line arguments which are being used in `build-deps` command via `$@`. In this case we are even allowing a cli flag `--clean` which allows us to run `act run deps --clean`.
+
+If we don't want to "polute" the actfile with a lot of scripting like we did for `build-deps` we could remove `cmds` field entirely and add a `build-deps` script inside an `acts` folder at the root of our project directory. When running `act run build-deps` act binary going to see the act does not have any `cmds` defined and going to look up a `acts/build-deps.sh` script to run instead. In other words, for a generic act called `foo` the folder structure should look like this:
 
 ```
 + my-project
@@ -54,7 +91,7 @@ If we don't specify `cmds` in `actfile.yml` file for `foo` then act going to loo
 |-- actfile.yml
 ```
 
-where actfile is defined like this:
+where actfile should be defined like this:
 
 ```yaml
 # actfile.yml
@@ -66,6 +103,32 @@ acts:
 ```
 
 since we don't define `cmds` in foo act then when executing `act run foo` we going to execute `acts/foo.sh` script.
+
+### Before Commands
+
+If we need to run commands before any act executed we can do it like this:
+
+```yaml
+# actfile.yml
+version: 1
+
+before:
+  - echo "running before"
+  - act: bar inline-arg-1 inline-arg-2
+  - act: zoo
+    args:
+      - non-inline-arg-1
+      - non-inline-arg-2
+
+acts:
+  foo:
+    cmds: echo "im foo"
+  bar:
+    cmds: echo "im bar with args=$@"
+  zoo:
+    cmds: echo "im zoo with args=$@"
+
+```
 
 ### Long Running Acts
 

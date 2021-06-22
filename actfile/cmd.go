@@ -7,6 +7,8 @@
 package actfile
 
 import (
+	"strings"
+	
 	"gopkg.in/yaml.v3"
 )
 
@@ -86,6 +88,12 @@ type Cmd struct {
 	 * ```
 	 */
 	Act string
+
+	/**
+	 * List of command line arguments to pass over to cmd/act when
+	 * executing it.
+	 */
+	Args []string
 }
 
 //############################################################
@@ -133,13 +141,26 @@ func (cmd *Cmd) UnmarshalYAML(value *yaml.Node) error {
 	var cmdObj struct {
 		Cmd    string
 		Script string
-		Act string
+		Act    string
+		Args   []string
 	}
 
 	if err := value.Decode(&cmdObj); err == nil {
 		cmd.Cmd = cmdObj.Cmd
 		cmd.Script = cmdObj.Script
 		cmd.Act = cmdObj.Act
+		cmd.Args = cmdObj.Args
+
+		// We let user pass command args together with act name.
+		if cmdObj.Act != "" {
+			args := strings.Split(cmdObj.Act, " ")
+			actCallId := args[0]
+			actArgs := args[1:]
+
+			cmd.Act = actCallId
+			cmd.Args = append(cmd.Args, actArgs...)
+		}
+
 		return nil
 	}
 

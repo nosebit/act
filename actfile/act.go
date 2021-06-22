@@ -176,6 +176,32 @@ type Act struct {
 }
 
 //############################################################
+// Internal Functions
+//############################################################
+/**
+ * This function going to receive a generic yaml node representing
+ * the acts map and convert it to an array of acts so we can
+ * keep the same key order of the defined map by user.
+ */
+func ConvertActsObjectToList(actsNode yaml.Node) []*Act {
+	var acts []*Act
+
+	for i := 0; i < len(actsNode.Content); i += 2 {
+		var actName string
+		var act Act
+
+		actsNode.Content[i].Decode(&actName)
+		actsNode.Content[i+1].Decode(&act)
+
+		act.Name = actName
+
+		acts = append(acts, &act)
+	}
+
+	return acts
+}
+
+//############################################################
 // Act Struct Functions
 //
 // Learning Notes: This is more or less the way we can have
@@ -212,21 +238,37 @@ func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 		 * Now lets convert acts from map (yaml) to
 		 * array (struct) so we can keep acts order.
 		 */
-		var acts []*Act
+		act.Acts = ConvertActsObjectToList(actObj.Acts)
+	}
 
-		for i := 0; i < len(actObj.Acts.Content); i += 2 {
-			var actName string
-			var act Act
+	/**
+	 * We can encode act cmds as a simple string of content.
+	 */
+	var actObj2 struct {
+		Desc    string
+		Cmds    string
+		Script  string
+		From    string
+		Acts    yaml.Node
+		Include string
+	}
 
-			actObj.Acts.Content[i].Decode(&actName)
-			actObj.Acts.Content[i+1].Decode(&act)
-
-			act.Name = actName
-
-			acts = append(acts, &act)
+	if err := value.Decode(&actObj2); err == nil {
+		cmd := Cmd{
+			Cmd: actObj2.Cmds,
 		}
 
-		act.Acts = acts
+		act.Desc = actObj2.Desc
+		act.Cmds = []*Cmd{&cmd}
+		act.Script = actObj2.Script
+		act.From = actObj2.From
+		act.Include = actObj2.Include
+
+		/**
+		 * Now lets convert acts from map (yaml) to
+		 * array (struct) so we can keep acts order.
+		 */
+		act.Acts = ConvertActsObjectToList(actObj2.Acts)
 	}
 
 	return nil

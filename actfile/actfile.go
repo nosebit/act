@@ -29,6 +29,12 @@ type ActFile struct {
 	Version string
 
 	/**
+	 * This is a list of commands to be run before execution
+	 * of any act.
+	 */
+	Before []*Cmd
+
+	/**
 	 * The user specifies one or more acts in the actfile. Each
 	 * act is a executable unit the user can call by name
 	 * using the cli command `act run <actName>`. Acts are
@@ -62,11 +68,13 @@ type ActFile struct {
 func (actFile *ActFile) UnmarshalYAML(value *yaml.Node) error {
 	var actFileObj struct {
 		Version string
+		Before  []*Cmd
 		Acts    yaml.Node
 	}
 
 	if err := value.Decode(&actFileObj); err == nil {
 		actFile.Version = actFileObj.Version
+		actFile.Before = actFileObj.Before
 
 		var acts []*Act
 
