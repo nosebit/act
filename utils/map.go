@@ -1,33 +1,18 @@
 package utils
 
-import "fmt"
+import (
+	"fmt"
+)
 
 /**
- * This function converts a vars map to an array of env vars.
- *
- * @param varsMap - Map of variables we want to convert to env vars list.
+ * This function going to convert a vars map to a list of dotenv vars format
+ * of "key=val" which we going to pass to command environment.
  */
-func VarsMapToEnvVars(varsMap map[string]interface{}) []string {
+func VarsMapToEnvVars(varsMap map[string]string) []string {
 	var envVars []string
 
-	/**
-	 * @TODO : We should allow map of maps here and convert something
-	 * like this:
-	 *
-	 * ```json
-	 * {
-	 *   "foo": {
-	 *      "bar": "value" 
-	 *   }
-	 * }
-	 * ```
-	 * 
-	 * to something like this ["FOO_BAR=value"]. Maybe we have a package
-	 * to do this.
-	 */
 	for name, value := range varsMap {
-		envVar := fmt.Sprintf("%s=%s", CamelToSnakeUpperCase(name), value)
-		envVars = append(envVars, envVar)
+		envVars = append(envVars, fmt.Sprintf("%s=%s", CamelToSnakeUpperCase(name), value))
 	}
 
 	return envVars

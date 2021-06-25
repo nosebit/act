@@ -1,0 +1,21 @@
+version: 1
+
+namespace: gchild
+
+before-all:
+  quiet: true
+  cmds:
+    - echo "before all in grandchild"
+    - echo "MANO=$MANO"
+
+acts:
+  act1:
+    flags:
+      - man
+    cmds:
+      - echo "grandchild act 1"
+      - echo "man=$FLAG_MAN"
+      - echo "MANO=$MANO"
+      - |
+        echo "somos assim"
+        echo $@

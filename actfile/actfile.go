@@ -8,6 +8,7 @@ package actfile
 
 import (
 	"os"
+	"sync"
 
 	"github.com/nosebit/act/utils"
 	"gopkg.in/yaml.v3"
@@ -29,10 +30,15 @@ type ActFile struct {
 	Version string
 
 	/**
+	 * Actfile namespace for logging
+	 */
+	Namespace string
+
+	/**
 	 * This is a list of commands to be run before execution
 	 * of any act.
 	 */
-	Before []*Cmd
+	BeforeAll *Act
 
 	/**
 	 * The user specifies one or more acts in the actfile. Each
@@ -47,6 +53,18 @@ type ActFile struct {
 	 * This is the actfile location path in file system.
 	 */
 	LocationPath string
+
+	/**
+	 * Env is a dotenv file we going to load before running
+	 * any act.
+	 */
+	EnvFilePath string
+
+	/**
+	 * This wait groups tell parallels acts that actfile
+	 * was initialized.
+	 */
+	InitWg *sync.WaitGroup
 }
 
 //############################################################
@@ -67,14 +85,22 @@ type ActFile struct {
  */
 func (actFile *ActFile) UnmarshalYAML(value *yaml.Node) error {
 	var actFileObj struct {
-		Version string
-		Before  []*Cmd
-		Acts    yaml.Node
+		Version   		string
+		Namespace 		string
+		BeforeAll 		*Act `yaml:"before-all"`
+		Acts      		yaml.Node
+		EnvFilePath   string `yaml:"envfile"`
 	}
 
 	if err := value.Decode(&actFileObj); err == nil {
 		actFile.Version = actFileObj.Version
-		actFile.Before = actFileObj.Before
+		actFile.Namespace = actFileObj.Namespace
+		actFile.BeforeAll = actFileObj.BeforeAll
+		actFile.EnvFilePath = actFileObj.EnvFilePath
+
+		if actFile.BeforeAll != nil {
+			actFile.BeforeAll.Name = "before"
+		}
 
 		var acts []*Act
 

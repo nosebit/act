@@ -1,13 +1,18 @@
 package utils
 
 import (
+	"fmt"
 	"log"
 	"os"
+
+	"github.com/logrusorgru/aurora/v3"
 )
 
 //############################################################
 // Internal Variables
 //############################################################
+var supressErrors bool = false
+
 var (
 	errorLogger *log.Logger
 	debugLogger *log.Logger
@@ -19,10 +24,19 @@ var (
 //############################################################
 
 /**
+ * This function going to silence logs.
+ */
+func SetSupressErrors() {
+	supressErrors = true
+}
+
+/**
  * This function going to log an error.
  */
 func LogError(args ...interface{}) {
-	errorLogger.Println(args...)
+	if !supressErrors {
+		errorLogger.Println(args...)
+	}
 }
 
 /**
@@ -57,7 +71,7 @@ func FatalError(args ...interface{}) {
  * On init we going to create all custom loggers.
  */
 func init() {
-	errorLogger = log.New(os.Stderr, "[ERROR] ", log.Ldate|log.Ltime)
-	debugLogger = log.New(os.Stdout, "[DEBUG] ", log.Ldate|log.Ltime|log.Lshortfile)
-	infoLogger = log.New(os.Stdout, "[INFO] ", log.Ldate|log.Ltime)
+	errorLogger = log.New(os.Stderr, fmt.Sprintf("%s", aurora.Red("[ERROR] ").Bold()), log.Ldate|log.Ltime)
+	debugLogger = log.New(os.Stdout, fmt.Sprintf("%s", aurora.Gray(8-1, "[DEBUG] ").Bold()), log.Ldate|log.Ltime|log.Lshortfile)
+	infoLogger = log.New(os.Stdout, fmt.Sprintf("%s", aurora.Cyan("[INFO] ").Bold()), log.Ldate|log.Ltime)
 }

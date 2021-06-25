@@ -8,7 +8,7 @@ package actfile
 
 import (
 	"strings"
-	
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -78,9 +78,9 @@ type Cmd struct {
 	 *     cmds:
 	 *       - echo "im bar"
 	 * ```
-	 * 
+	 *
 	 * so when we run `act run foo` we going to see this printed:
-	 * 
+	 *
 	 * ```bash
 	 * foo before bar
 	 * im bar
@@ -94,6 +94,11 @@ type Cmd struct {
 	 * executing it.
 	 */
 	Args []string
+
+	/**
+	 * Disable logging
+	 */
+	Quiet bool
 }
 
 //############################################################
@@ -143,6 +148,7 @@ func (cmd *Cmd) UnmarshalYAML(value *yaml.Node) error {
 		Script string
 		Act    string
 		Args   []string
+		Quiet  bool
 	}
 
 	if err := value.Decode(&cmdObj); err == nil {
@@ -150,6 +156,7 @@ func (cmd *Cmd) UnmarshalYAML(value *yaml.Node) error {
 		cmd.Script = cmdObj.Script
 		cmd.Act = cmdObj.Act
 		cmd.Args = cmdObj.Args
+		cmd.Quiet = cmdObj.Quiet
 
 		// We let user pass command args together with act name.
 		if cmdObj.Act != "" {

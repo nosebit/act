@@ -10,7 +10,8 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/nosebit/act/actfile"
+	"github.com/logrusorgru/aurora/v3"
+	"github.com/nosebit/act/run"
 	"github.com/nosebit/act/utils"
 )
 
@@ -21,7 +22,7 @@ import (
 /**
  * This is the main execution point for the `log` command.
  */
-func StopCmdExec(args []string, _ *actfile.ActFile) {
+func StopCmdExec(args []string) {
 	/**
 	 * We create a new flag set to allow this act subcommand to
 	 * accepts flags by their own.
@@ -58,21 +59,17 @@ func StopCmdExec(args []string, _ *actfile.ActFile) {
 	actNameId := cmdArgs[0]
 
 	// Get act info
-	info := GetActRunInfo(actNameId)
+	info := run.GetInfo(actNameId)
 
-	fmt.Println("@@@ run info to stop", info)
-
-	// Find Gpid so we can kill all children process as well
-	pgid, err := syscall.Getpgid(info.Pid)
-
-	if err != nil {
-		utils.FatalError(fmt.Sprintf("could not kill process with pgid=%d", pgid), err)
+	if info == nil {
+		utils.FatalError("act not found")
 	}
 
-	fmt.Println("PID IS ", info.Pid)
-	fmt.Println("PGID IS ", info.Pgid, pgid)
+	// Lets kill all running commands
+	for _, pgid := range info.Pgids {
+		syscall.Kill(-pgid, syscall.SIGKILL)
+	}
 
-	syscall.Kill(-pgid, syscall.SIGKILL)
-
-	utils.RmActDataDir(actNameId)
+	info.RmDataDir()
+	fmt.Println(fmt.Sprintf("act %s stopped", aurora.Green(info.NameId).Bold()))
 }

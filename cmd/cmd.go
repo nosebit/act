@@ -7,7 +7,7 @@ import (
 	"flag"
 	"os"
 
-	"github.com/nosebit/act/actfile"
+	"github.com/nosebit/act/run"
 )
 
 //############################################################
@@ -26,18 +26,18 @@ var cmdName string
  * This is the entrypoint function of this package and it's going to decide
  * which act cli command to run.
  */
-func Exec(args []string, actfile *actfile.ActFile) {
+func Exec(args []string) {
 	cmdName = args[0]
 
 	switch cmdName {
 	case "run":
-		RunCmdExec(args[1:], actfile)
+		run.Exec(args[1:])
 	case "log":
-		LogCmdExec(args[1:], actfile)
+		LogCmdExec(args[1:])
 	case "list":
-		ListCmdExec(args[1:], actfile)
+		ListCmdExec()
 	case "stop":
-		StopCmdExec(args[1:], actfile)
+		StopCmdExec(args[1:])
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -51,7 +51,7 @@ func Exec(args []string, actfile *actfile.ActFile) {
 func Cleanup() {
 	switch cmdName {
 	case "run":
-		RunCleanup()
+		run.Cleanup()
 	case "log":
 		LogCleanup()
 	default:

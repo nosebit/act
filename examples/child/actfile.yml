@@ -1,0 +1,39 @@
+version: 1
+
+namespace: child
+
+before-all:
+  quiet: true
+  cmds:
+    - echo "before all in child"
+
+acts:
+  act1:
+    cmds:
+      - echo "child act 1"
+
+  act2:
+    cmds:
+      - echo "child act 2"
+
+  long:
+    flags:
+      - name
+    parallel: true
+    cmds:
+      - |
+        echo "running cmd1"
+
+        for i in {1..5}; do
+          echo "cmd1 $i $FLAG_NAME"; sleep 2
+        done
+      - |
+        echo "running cmd2"
+
+        for i in {1..5}; do
+          echo "cmd2 $i $FLAG_NAME"; sleep 2
+        done
+      
+
+  grandchild:
+    include: grandchild/actfile.yml

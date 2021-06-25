@@ -76,6 +76,11 @@ type Act struct {
 	Desc string
 
 	/**
+	 * List of CLI flags that can be passed over to this act.
+	 */
+	Flags []string
+
+	/**
 	 * The first way we can specify what this act going to do
 	 * is proving a list of shell commands that going to be
 	 * executed in sequence like the following:
@@ -108,7 +113,7 @@ type Act struct {
 	 * # actfile.yml
 	 * acts:
 	 *   foo:
-	 *     from: another/actfile.yml
+	 *     redirect: another/actfile.yml
 	 * ```
 	 *
 	 * and
@@ -124,7 +129,7 @@ type Act struct {
 	 * then when we invoke `act run foo` in the folder containing
 	 * actfile.yml we going to get "im foo" printed in the screen.
 	 */
-	From string
+	Redirect string
 
 	/**
 	 * We can specify nested acts that can be invoked like sub
@@ -173,6 +178,16 @@ type Act struct {
 	 * allows us to split act definition in multiple files.
 	 */
 	Include string
+
+	/**
+	 * Prevent logging.
+	 */
+	Quiet bool
+
+	/**
+	 * Run act commands in parallel.
+	 */
+	Parallel bool
 }
 
 //############################################################
@@ -219,20 +234,26 @@ func ConvertActsObjectToList(actsNode yaml.Node) []*Act {
  */
 func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 	var actObj struct {
-		Desc    string
-		Cmds    []*Cmd
-		Script  string
-		From    string
-		Acts    yaml.Node
-		Include string
+		Desc     string
+		Cmds     []*Cmd
+		Flags    []string
+		Script   string
+		Redirect string
+		Acts     yaml.Node
+		Include  string
+		Quiet    bool
+		Parallel bool
 	}
 
 	if err := value.Decode(&actObj); err == nil {
 		act.Desc = actObj.Desc
 		act.Cmds = actObj.Cmds
+		act.Flags = actObj.Flags
 		act.Script = actObj.Script
-		act.From = actObj.From
+		act.Redirect = actObj.Redirect
 		act.Include = actObj.Include
+		act.Quiet = actObj.Quiet
+		act.Parallel = actObj.Parallel
 
 		/**
 		 * Now lets convert acts from map (yaml) to
@@ -245,12 +266,15 @@ func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 	 * We can encode act cmds as a simple string of content.
 	 */
 	var actObj2 struct {
-		Desc    string
-		Cmds    string
-		Script  string
-		From    string
-		Acts    yaml.Node
-		Include string
+		Desc     string
+		Cmds     string
+		Flags    []string
+		Script   string
+		Redirect string
+		Acts     yaml.Node
+		Include  string
+		Quiet    bool
+		Parallel bool
 	}
 
 	if err := value.Decode(&actObj2); err == nil {
@@ -260,9 +284,12 @@ func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 
 		act.Desc = actObj2.Desc
 		act.Cmds = []*Cmd{&cmd}
+		act.Flags = actObj2.Flags
 		act.Script = actObj2.Script
-		act.From = actObj2.From
+		act.Redirect = actObj2.Redirect
 		act.Include = actObj2.Include
+		act.Quiet = actObj2.Quiet
+		act.Parallel = actObj2.Parallel
 
 		/**
 		 * Now lets convert acts from map (yaml) to

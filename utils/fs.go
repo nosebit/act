@@ -9,26 +9,8 @@ import (
 	"io"
 	"os"
 	"path"
-	"strings"
+	"path/filepath"
 )
-
-//############################################################
-// Constants
-//############################################################
-
-/**
- * In s subact chain we separate each act name by this separator
- * like when we run `act run foo.bar`. In this case `bar` is a
- * subact of the act `foo` and the whole act is uniquely identified
- * by the name `foo.bar`.
- */
-const ActCallIdSeparator = "."
-
-/**
- * This is the name of the directory where we going to hold
- * all info for running acts.
- */
-const DataDirName = ".actdt"
 
 //############################################################
 // Exposed Functions
@@ -83,47 +65,6 @@ func IsEmptyDir(dirPath string) bool {
 }
 
 /**
- * This function going to remove a directory and all of its empty
- * ancestor directories.
- *
- * @param dirPath - The starting directory path.
- * @param stopDirName - Directory which should be used as a stop
- *   point for the remove process. When we find a directory with
- *   this name we going to prevent removing it and all it's
- *   ancestors.
- */
-func RmDirAndEmptyAncestors(dirPath string, stopDirName string) {
-	err := os.RemoveAll(dirPath)
-
-	if err != nil {
-		FatalError(fmt.Sprintf("could not remove dir %s", dirPath), err)
-	}
-
-	parentDirPath := path.Dir(dirPath)
-	parentDirName := path.Base(parentDirPath)
-
-	for parentDirName != stopDirName && IsEmptyDir(parentDirPath) {
-		err := os.RemoveAll(parentDirPath)
-
-		if err != nil {
-			FatalError(fmt.Sprintf("could not remove dir %s", parentDirPath), err)
-		}
-
-		parentDirPath = path.Dir(parentDirPath)
-		parentDirName = path.Base(parentDirPath)
-	}
-}
-
-/**
- * This function going to remove an act data dir.
- */
-func RmActDataDir(actCallId string) {
-	dirPath := GetActDataDirPath(actCallId)
-
-	RmDirAndEmptyAncestors(dirPath, DataDirName)
-}
-
-/**
  * This function going to write a simple string to a file in append
  * mode.
  */
@@ -149,46 +90,18 @@ func ResolvePathFromWd(aPath string) string {
 }
 
 /**
- * This function gets the acts data dir path.
+ * This function going to resolve a file path from a base dir path
+ * if the file path is relative. Otherwise if file path is absolute
+ * we going to return it instead.
  */
-func GetDataDirPath() string {
-	return path.Join(GetWd(), DataDirName)
-}
+func ResolvePath(baseDir string, targetPath string) string {
+	var thePath string
 
-/**
- * This function get act data dir path for a specific act
- * name id or sequence of act names.
- */
-func GetActDataDirPath(actCallId string) string {
-	actNames := strings.Split(actCallId, ActCallIdSeparator)
-	actDirPath := path.Join(actNames...)
+	if filepath.IsAbs(targetPath) {
+		thePath = targetPath
+	} else {
+		thePath = path.Join(baseDir, targetPath)
+	}
 
-	return path.Join(GetDataDirPath(), actDirPath)
-}
-
-/**
- * This going to get the pid file path for a specific act.
- */
-func GetActPidFilePath(actCallId string) string {
-	dtdir := GetActDataDirPath(actCallId)
-
-	return path.Join(dtdir, "pid")
-}
-
-/**
- * This going to get the log file path for a specific act.
- */
-func GetActLogFilePath(actCallId string) string {
-	dtdir := GetActDataDirPath(actCallId)
-
-	return path.Join(dtdir, "log")
-}
-
-/**
- * This going to get the act main script path for a specific act.
- */
-func GetActScriptFilePath(actCallId string) string {
-	dtdir := GetActDataDirPath(actCallId)
-
-	return path.Join(dtdir, "script.sh")
+	return thePath
 }

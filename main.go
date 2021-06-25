@@ -2,13 +2,11 @@
  * WaitGroup example: https://adampresley.github.io/2015/02/16/waiting-for-goroutines-to-finish-running-before-exiting.html
  */
 
-
 package main
 
 import (
 	"os"
 	"os/signal"
-	"path"
 	"sync"
 	"syscall"
 
@@ -17,7 +15,7 @@ import (
 	 * so we can use functions/properties exposed on those
 	 * packeges.
 	 */
-	"github.com/nosebit/act/actfile"
+
 	"github.com/nosebit/act/cmd"
 	"github.com/nosebit/act/utils"
 )
@@ -28,7 +26,6 @@ import (
  * example the entrypoint file of actfile package going to
  * be actfile/actfile.go.
  */
-
 
 //############################################################
 // Internal Functions
@@ -45,7 +42,7 @@ func scheduleQuitCleanup() *sync.WaitGroup {
 
 	/**
 	 * Run our cleanup function as a go routine (i.e., in parallel) so
-	 * we don't block the main execution since we need to wait for 
+	 * we don't block the main execution since we need to wait for
 	 * a quit event to do the cleanup job.
 	 */
 	go func() {
@@ -80,7 +77,6 @@ func scheduleQuitCleanup() *sync.WaitGroup {
 	return &wg
 }
 
-
 //############################################################
 // Main Entrypoint
 //############################################################
@@ -101,14 +97,6 @@ func main() {
 	cleanup := scheduleQuitCleanup()
 
 	//--------------------------------------------------
-	// Parse actfile
-	//--------------------------------------------------
-	wdir := utils.GetWd()
-
-	// We read/parse actfile.yml file from current working dir
-	actFile := actfile.ReadActFile(path.Join(wdir, "actfile.yml"))
-
-	//--------------------------------------------------
 	// Parse command line args
 	//--------------------------------------------------
 	args := os.Args[1:]
@@ -121,7 +109,7 @@ func main() {
 	}
 
 	// Now we execute subcommand (synchronously)
-	cmd.Exec(args, actFile)
+	cmd.Exec(args)
 
 	// Wait cleanup to finish
 	cleanup.Wait()

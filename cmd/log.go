@@ -11,7 +11,7 @@ import (
 	"os"
 
 	"github.com/hpcloud/tail"
-	"github.com/nosebit/act/actfile"
+	"github.com/nosebit/act/run"
 	"github.com/nosebit/act/utils"
 )
 
@@ -27,7 +27,7 @@ var ta *tail.Tail
 /**
  * This is the main execution point for the `log` command.
  */
-func LogCmdExec(args []string, _ *actfile.ActFile) {
+func LogCmdExec(args []string) {
 	/**
 	 * We create a new flag set to allow this act subcommand to
 	 * accepts flags by their own.
@@ -73,9 +73,15 @@ func LogCmdExec(args []string, _ *actfile.ActFile) {
 	/**
 	 * Get act run info
 	 */
-	info := GetActRunInfo(actNameId)
+	info := run.GetInfo(actNameId)
 
-	if _, err := os.Stat(info.LogFilePath); err != nil {
+	if info == nil {
+		utils.FatalError("act not found")
+	}
+
+	logFilePath := info.GetLogFilePath()
+
+	if _, err := os.Stat(logFilePath); err != nil {
 		utils.FatalError("nothing to log")
 	}
 
@@ -85,7 +91,7 @@ func LogCmdExec(args []string, _ *actfile.ActFile) {
 	 * tail package shows nothing.
 	 */
 
-	t, err := tail.TailFile(info.LogFilePath, tail.Config{
+	t, err := tail.TailFile(logFilePath, tail.Config{
 		Follow: *followPtr,
 		Location: &tail.SeekInfo{
 			Offset: -500,
