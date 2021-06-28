@@ -1,11 +1,10 @@
 version: 1
 
-namespace: child
-
 before-all:
   quiet: true
   cmds:
     - echo "before all in child"
+    - echo "CHILD_VAR=Carlos" >> $ACT_ENV
 
 acts:
   act1:
@@ -15,6 +14,7 @@ acts:
   act2:
     cmds:
       - echo "child act 2"
+      - echo "CHILD_VAR=$CHILD_VAR"
 
   long:
     flags:

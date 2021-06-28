@@ -61,10 +61,21 @@ type ActFile struct {
 	EnvFilePath string
 
 	/**
+	 * Log mode.
+	 */
+	Log string
+
+	/**
 	 * This wait groups tell parallels acts that actfile
 	 * was initialized.
 	 */
 	InitWg *sync.WaitGroup
+
+	/**
+	 * Set the shell to be used when running commands. By default
+	 * we use bash shell.
+	 */
+	Shell string
 }
 
 //############################################################
@@ -90,6 +101,8 @@ func (actFile *ActFile) UnmarshalYAML(value *yaml.Node) error {
 		BeforeAll 		*Act `yaml:"before-all"`
 		Acts      		yaml.Node
 		EnvFilePath   string `yaml:"envfile"`
+		Log      			string
+		Shell         string
 	}
 
 	if err := value.Decode(&actFileObj); err == nil {
@@ -97,6 +110,8 @@ func (actFile *ActFile) UnmarshalYAML(value *yaml.Node) error {
 		actFile.Namespace = actFileObj.Namespace
 		actFile.BeforeAll = actFileObj.BeforeAll
 		actFile.EnvFilePath = actFileObj.EnvFilePath
+		actFile.Log = actFileObj.Log
+		actFile.Shell = actFileObj.Shell
 
 		if actFile.BeforeAll != nil {
 			actFile.BeforeAll.Name = "before"

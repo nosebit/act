@@ -71,16 +71,24 @@ acts:
 
 Notice that acts can receive command line arguments which are being used in `build-deps` command via `$@`.
 
-If we don't want to "polute" the actfile with a lot of scripting like we did for `build-deps` we could remove `cmds` field entirely and add a `build-deps` script inside an `acts` folder at the root of our project directory. When running `act run build-deps` act binary going to see the act does not have any `cmds` defined and going to look up a `acts/build-deps.sh` script to run instead. In other words, for a generic act called `foo` the folder structure should look like this:
+
+### Running Scripts as Commands
+
+If we don't want to "polute" the actfile with a lot of scripting like we did for `build-deps` we can provide a script file using the `script` field of a command like this:
+
+```yaml
+# actfile.yml
+version: 1
+
+acts:
+  build-deps:
+    desc: This act going to build dependencies in a workspace and optionally clean everything before start.
+    cmds:
+      - script: /path/to/script.sh
 
 ```
-+ my-project
-|--+ acts
-   |-- foo.sh
-|-- actfile.yml
-```
 
-where actfile should be defined like this:
+By default Act going to use `bash` as it's default shell but you can customize the shell to use via `shell` field in actfile, act or command levels like this:
 
 ```yaml
 # actfile.yml
@@ -88,10 +96,17 @@ version: 1
 
 acts:
   foo:
-    desc: This is a simple hello world act example
+    cmds:
+      - cmd: echo "hello"
+        shell: sh
+      - script: /path/to/script.sh
+        shell: bash # default
+  bar:
+    shell: bash # default
+    cmds:
+      - echo "bar 1"
+      - echo "bar 2"
 ```
-
-since we don't define `cmds` in foo act then when executing `act run foo` we going to execute `acts/foo.sh` script.
 
 
 ### Before Commands
@@ -148,26 +163,6 @@ acts:
 ```
 
 
-### Sharing Env Vars Between Commands
-
-Act going to run commands in independent shell environments to allow parallel execution as discussed in the previous section. That way if we need to share variables between commands (or acts) we can write variables as `key=val` strings to a special dotenv file which location is provided by `$ACT_ENV` var. Here an example:
-
-```yaml
-# actfile.yml
-version: 1
-
-acts:
-  foo:
-    cmds:
-      - echo "MY_VAR=nosebit" >> $ACT_ENV
-      - echo "MY_VAR is $MY_VAR"
-```
-
-This way when we run `act run foo` we should see `MY_VAR is nosebit` printed to the screen.
-
-**WARNING**: Be careful with race conditions when reading/write variables to `$ACT_ENV` when running commands in parallel.
-
-
 ### Act Name Matching
 
 The act name we use in `actfile.yml` is actually a regex we going to match against the name use provide to `act run` command. That way if we have:
@@ -189,7 +184,32 @@ we can call
 act run foo-bar
 ```
 
-and see `i'm foo-bar` printed in the screen. 
+and see `i'm foo-bar` printed in the screen.
+
+
+### Subacts
+
+We can defined subacts like this:
+
+```yaml
+# actfile.yml
+version: 1
+
+acts:
+  foo:
+    desc: This is a simple long running act example
+    acts:
+      bar:
+        cmds:
+          - echo "im bar subact of foo"
+```
+
+which we can run like this:
+
+```bash
+act run foo.bar
+```
+
 
 ### Including Acts
 
@@ -354,6 +374,28 @@ We have some variables at our disposition like the following:
 
 @TODO : We need to allow user specifying variables directly in actfile.
 
+### Sharing Env Vars Between Commands
+
+Act going to run commands in independent shell environments to allow parallel execution as discussed in the previous section. That way if we need to share variables between commands (or acts) we can write variables as `key=val` strings to a special dotenv file which location is provided by `$ACT_ENV` var. Here an example:
+
+```yaml
+# actfile.yml
+version: 1
+
+acts:
+  foo:
+    cmds:
+      - grep -q MY_VAR $ACT_ENV || printf "MY_VAR=Bruno\n" >> $ACT_ENV
+      - echo "MY_VAR is $MY_VAR"
+```
+
+The first command going to check if `MY_VAR` is already set in `ACT_ENV` and if not we going to add this variable and its value to `ACT_ENV`. This way when we run `act run foo` we should see `MY_VAR is nosebit` printed to the screen.
+
+**NOTE**: Variables set to `ACT_ENV` going to be persisted as long the act is running. On stop/finish of act execution the main act process going to deleted all variables set. If we need to persist variables see the next section on loading variables from a specific file (not managed by act process itself).
+
+**WARNING**: Be careful with race conditions when reading/write variables to `$ACT_ENV` when running commands in parallel.
+
+
 ### Loading Variables From File
 
 Act support dotenv vars file to be loaded before the execution of an act. So suppose we have the following `.vars` file in the root of our project:
@@ -390,6 +432,24 @@ acts:
     include: "{{.MY_VAR}}/actfile.yml"
 ```
 
+With this env file set we can persist variables between different executions of an act. So, if we have the following:
+
+```yaml
+# actfile.yml
+version: 1
+
+envfile: .var
+
+acts:
+  foo:
+    cmds:
+      - grep -q MY_VAR $ACT_ENV_FILE || printf "MY_VAR=Bruno\n" >> $ACT_ENV_FILE
+      - echo "MY_VAR is $MY_VAR"
+```
+
+then we can execute `act run foo` multiple times and `MY_VAR` going to be persisted. Note that we ca use `ACT_ENV_FILE` variable to reference our env file.
+
+
 ### Command Line Flags
 
 If we want to support command line flags in our acts we can do it like the following:
@@ -414,6 +474,66 @@ acts:
 This way we can run `act run foo -daemon -name=Bruno arg1 arg2`. Note that boolean flags which can be provided without values should have a default `false` added.
 
 
+### Command Loops
+
+If we need to run multiple commands that are very similar we can use loop functionality like this:
+
+```yaml
+# actfile.yml
+version: 1
+
+acts:
+  foo:
+    cmds:
+      - cmd: echo {{.LoopItem}}
+        loop:
+          items:
+            - name1
+            - name2
+            - name3
+```
+
+The loop field also accepts a `glob` option we can use to set items to be the list of matched file paths like this:
+
+```yaml
+# actfile.yml
+version: 1
+
+acts:
+  setup:
+    cmds:
+      - act: setup
+        from: "{{.LoopItem}}"
+        loop:
+          glob: "**/actfile.yml"
+        mismatch: allow
+```
+
+This way we going to loop over all subdiretories that has an `actfile.yml` in it and run the act named setup in those actfiles. Notice we used the `mismatch` field to prevent error in case actfile does not provide a `setup` rule.
+
+
+### Log Mode
+
+By default Act going to output logs in raw mode without any info about the act or timestamp. If we need prefix log output with act name and timestamp we can set `log` field to `prefixed` at act or actfile levels like this:
+
+```yaml
+# actfile.yml
+version: 1
+
+acts:
+  foo:
+    log: prefixed
+    cmds:
+      - echo "im prefixed"
+```
+
+We can use the command line flag `l` as well to set log mode like this:
+
+```bash
+act run -l=prefixed test-unit
+```
+
+
 ### Long Running Acts
 
 If an act is written to be a long running process like the following:
@@ -429,7 +549,7 @@ acts:
       - while true; echo "Hello long running"; sleep 5; done
 ```
 
-then we can run it as a daemon using the following command:
+we can run it as a daemon using the following command:
 
 ```bash
 act run -d foo
@@ -447,7 +567,25 @@ and finally to stop an act by it's name we can use:
 act stop foo
 ```
 
-If we want to run multiple acts as separate processes to be self managed we can do like this:
+Keep in mind that if we run `foo` act multiple times as daemons we going to endup having multiple running instances of the same act which is totally fine. But when running `act stop foo` we going to kill all `foo` instances at once. We can distinguish `foo` instances using `tags` flag like the following:
+
+```bash
+act run -d -t=foo-1 foo
+act run -d -t=foo-2 foo
+```
+
+and then if we want to stop just `foo-1` instance we can use
+
+```bash
+act stop -t=foo-1 foo
+```
+
+which going to stop all instances of `foo` act which has tag `foo-1`.
+
+
+### Detached Long Running Acts
+
+If we need to run subacts as detached act processes which can be managed independently we can do like this:
 
 ```yaml
 # actfile.yml
@@ -462,32 +600,11 @@ acts:
   all:
     parallel: true
     cmds:
-      - act run -f={{.ActFilePath}} long1
-      - act run -f={{.ActFilePath}} long2
+      - act: long1
+        detach: true
+
+      - act: long2
+        detach: true
 ```
 
-This way if we run `act run all` we going to run long1 and long2 as different act processes and we can stop only one of those with `act stop long1` for example. If we want to kill everything we can do `act stop all`.
-
-
-### Subacts
-
-We can defined subacts like this:
-
-```yaml
-# actfile.yml
-version: 1
-
-acts:
-  foo:
-    desc: This is a simple long running act example
-    acts:
-      bar:
-        cmds:
-          - echo "im bar subact of foo"
-```
-
-which we can run like this:
-
-```bash
-act run foo.bar
-```
+This way if we run `act run all` we going to run long1 and long2 as different act processes and we can stop only one of those with `act stop all::long1` for example. If we want to kill everything we can do `act stop all`.

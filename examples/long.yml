@@ -1,0 +1,17 @@
+version: 1
+
+acts:
+  long1:
+    cmds: while true; do echo "hello long1"; sleep 4; done
+  
+  long2:
+    cmds: while true; do echo "hello long2"; sleep 2; done
+
+  all:
+    parallel: true
+    log: prefixed
+    cmds:
+      - act: long1
+        detach: true
+      - act: long2
+        detach: true

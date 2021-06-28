@@ -66,10 +66,20 @@ func StopCmdExec(args []string) {
 	}
 
 	// Lets kill all running commands
-	for _, pgid := range info.Pgids {
+	for _, pgid := range info.ChildPgids {
 		syscall.Kill(-pgid, syscall.SIGKILL)
 	}
 
+	// Stop main process as well
+	syscall.Kill(-info.Pgid, syscall.SIGKILL)
+
 	info.RmDataDir()
+
+	// Kill all children processes
+	run.KillChildren(info)
+
 	fmt.Println(fmt.Sprintf("act %s stopped", aurora.Green(info.NameId).Bold()))
+
+	// Kill parents if needed
+	run.KillParentsIfNeeded(info)
 }

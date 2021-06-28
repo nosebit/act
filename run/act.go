@@ -1,6 +1,7 @@
 package run
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"path"
@@ -9,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/iancoleman/strcase"
+	"github.com/joho/godotenv"
 	"github.com/nosebit/act/actfile"
 	"github.com/nosebit/act/utils"
 )
@@ -68,6 +70,11 @@ type ActRunCtx struct {
 	Args []string
 
 	/**
+	 * Act runtime vars.
+	 */
+	ActVars map[string]string
+
+	/**
 	 * Set of variables scoped to act execution.
 	 */
 	Vars map[string]string
@@ -90,6 +97,55 @@ func (ctx *ActRunCtx) Print() {
 		fmt.Println("Act", currCtx.CallId)
 		fmt.Println("  actFile", currCtx.ActFile.LocationPath)
 	}
+}
+
+/**
+ * This function going to merge all variables altogether.
+ */
+func (ctx *ActRunCtx) MergeVars() map[string]string {
+	vars := make(map[string]string)
+
+	runtimeVars, _ := godotenv.Read(ctx.RunCtx.Info.GetEnvVarsFilePath())
+
+	// Get vars from file
+	envFileVars := make(map[string]string)
+
+	if ctx.ActFile.EnvFilePath != "" {
+		envFilePath := utils.ResolvePath(path.Dir(ctx.ActFile.LocationPath), ctx.ActFile.EnvFilePath)
+		envars, _ := godotenv.Read(envFilePath)
+		envFileVars = envars
+	}
+
+	varsMapList := []map[string]string{
+		// Load vars from files first.
+		envFileVars,
+
+		// Global vars has precedence over vars loaded from file.
+		ctx.RunCtx.Vars,
+
+		// Local vars has precedence over global vars.
+		ctx.Vars,
+
+		// Runtime vars has precedence over local vars.
+		runtimeVars,
+
+		// Act runtime global vars has precedence over all other vars.
+		ctx.RunCtx.ActVars,
+
+		// Act runtime local vars has precedence over all other vars.
+		ctx.ActVars,
+
+		// Flag vars has precedence over all other vars.
+		ctx.FlagVals,
+	}
+
+	for _, varsMap := range varsMapList {
+		for key, val := range varsMap {
+			vars[key] = val
+		}
+	}
+
+	return vars
 }
 
 /**
@@ -146,14 +202,16 @@ func (ctx *ActRunCtx) ExecBeforeAll() {
 		if beforeAll != nil && len(beforeAll.Cmds) > 0 {
 			currCtx.ActFile.InitWg.Add(1)
 
-			var beforeCallId string
+			//var beforeCallId string
 
-			if currCtx.ActFile.Namespace != "" {
+			/*if currCtx.ActFile.Namespace != "" {
 				beforeCallId = fmt.Sprintf("%s.before", currCtx.ActFile.Namespace)
 			} else {
 				dir := path.Base(path.Dir(currCtx.ActFile.LocationPath))
 				beforeCallId = fmt.Sprintf("%s.before", dir)
-			}
+			}*/
+
+			beforeCallId := fmt.Sprintf("%s::before", currCtx.CallId)
 
 			beforeAllCtx := ActRunCtx{
 				CallId:  beforeCallId,
@@ -263,13 +321,8 @@ func (ctx *ActRunCtx) Exec() {
 		wg.Add(len(ctx.Act.Cmds))
 	}
 
-	for _, cmd := range ctx.Act.Cmds {
-		if ctx.Act.Parallel {
-			go CmdExec(cmd, ctx, &wg)
-		} else {
-			CmdExec(cmd, ctx, nil)
-		}
-	}
+	// Execute all act commands
+	CmdsExec(ctx.Act.Cmds, ctx, &wg)
 
 	/**
 	 * Wait all commands to finish because acts going to run
@@ -291,9 +344,9 @@ func FindActCtx(
 	actFile *actfile.ActFile,
 	prevCtx *ActRunCtx,
 	runCtx *RunCtx,
-) *ActRunCtx {
+) (*ActRunCtx, error) {
 	if len(actNames) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	targetActName := actNames[0]
@@ -353,18 +406,16 @@ func FindActCtx(
 			ActFile: actFile,
 			PrevCtx: prevCtx,
 			Vars:    make(map[string]string),
+			ActVars: make(map[string]string),
 			RunCtx:  runCtx,
 		}
 
-		// Merge Vars from run context
-		for key, val := range runCtx.Vars {
-			ctx.Vars[key] = val
-		}
-
 		// Act vars has precedence
-		ctx.Vars["ActName"] = targetActName
-		ctx.Vars["ActFilePath"] = ctx.ActFile.LocationPath
-		ctx.Vars["ActFileDir"] = path.Dir(ctx.ActFile.LocationPath)
+		ctx.ActVars["ActName"] = targetActName
+		ctx.ActVars["ActFilePath"] = ctx.ActFile.LocationPath
+		ctx.ActVars["ActFileDir"] = path.Dir(ctx.ActFile.LocationPath)
+
+		vars := ctx.MergeVars()
 
 		if prevCtx != nil {
 			ctx.CallId = strings.Join(append(strings.Split(prevCtx.CallId, ActCallIdSeparator), targetActName), ActCallIdSeparator)
@@ -402,8 +453,9 @@ func FindActCtx(
 		 * printed to the screen.
 		 */
 		if act.Redirect != "" {
-			redirect := utils.CompileTemplate(act.Redirect, ctx.Vars)
+			redirect := utils.CompileTemplate(act.Redirect, vars)
 			newActFile := actfile.ReadActFile(utils.ResolvePath(wd, redirect))
+
 			return FindActCtx(actNames, newActFile, &ctx, runCtx)
 		}
 
@@ -433,8 +485,9 @@ func FindActCtx(
 		 * actfile" poping in screen.
 		 */
 		if act.Include != "" {
-			include := utils.CompileTemplate(act.Include, ctx.Vars)
+			include := utils.CompileTemplate(act.Include, vars)
 			newActFile := actfile.ReadActFile(utils.ResolvePath(wd, include))
+
 			return FindActCtx(actNames[1:], newActFile, &ctx, runCtx)
 		}
 
@@ -446,9 +499,10 @@ func FindActCtx(
 			return FindActCtx(actNames[1:], actFile, &ctx, runCtx)
 		}
 
-		return &ctx
+		return &ctx, nil
 	}
 
-	utils.FatalError(fmt.Sprintf("act %s not found in %s", targetActName, actFileLocationPath))
-	return nil
+	err := errors.New(fmt.Sprintf("act %s not found in %s", targetActName, actFileLocationPath))
+
+	return nil, err
 }

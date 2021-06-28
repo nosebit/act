@@ -1,7 +1,5 @@
 version: 1
 
-namespace: ex
-
 envfile: .env
 
 before-all:
@@ -21,15 +19,19 @@ acts:
     cmds:
       - echo "hello act0"
       - echo "Rendered {{.MY_ENV_VAR}}"
+      - grep -q MY_NAME $ACT_ENV_FILE || printf "MY_NAME=Shirley\n" >> $ACT_ENV_FILE
       - echo "MY_ENV_VAR=$MY_ENV_VAR"
+      - echo "MY_NAME is $MY_NAME"
 
   act1:
     flags:
-      - test:false
+      - check:false
+      - name
     cmds:
       - echo "root act 1"
-      - echo "test=$FLAG_TEST"
-      - echo "MANO IS=$MANO"
+      - echo "check=$FLAG_CHECK"
+      - echo "name is $FLAG_NAME"
+      - echo "other args are $@"
 
   act2:
     redirect: child/actfile.yml
@@ -45,28 +47,6 @@ acts:
     cmds:
       - act: act2
       - act: act1 -test
-  
-  long1:
-    cmds: while true; do echo "hello long1"; sleep 4; done
-  
-  long2:
-    cmds: while true; do echo "hello long2"; sleep 2; done
-  
-  long3:
-    cmds: act 
-
-  all-long:
-    parallel: true
-    cmds:
-      - act run -f={{.ActFilePath}} long1
-      - act run -f={{.ActFilePath}} long2
-
-  merda:
-    cmds: |
-      for i in {1..5}; do
-        echo "saco de merda $i"
-        sleep 4
-      done
 
   child:
     include: child/actfile.yml

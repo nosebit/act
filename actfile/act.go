@@ -185,9 +185,20 @@ type Act struct {
 	Quiet bool
 
 	/**
+	 * Log mode.
+	 */
+	Log string
+
+	/**
 	 * Run act commands in parallel.
 	 */
 	Parallel bool
+
+	/**
+	 * Set the shell to be used when running commands. By default
+	 * we use bash shell.
+	 */
+	Shell string
 }
 
 //############################################################
@@ -243,6 +254,8 @@ func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 		Include  string
 		Quiet    bool
 		Parallel bool
+		Log      string
+		Shell    string
 	}
 
 	if err := value.Decode(&actObj); err == nil {
@@ -254,6 +267,8 @@ func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 		act.Include = actObj.Include
 		act.Quiet = actObj.Quiet
 		act.Parallel = actObj.Parallel
+		act.Log = actObj.Log
+		act.Shell = actObj.Shell
 
 		/**
 		 * Now lets convert acts from map (yaml) to
@@ -275,6 +290,8 @@ func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 		Include  string
 		Quiet    bool
 		Parallel bool
+		Log      string
+		Shell    string
 	}
 
 	if err := value.Decode(&actObj2); err == nil {
@@ -290,6 +307,8 @@ func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 		act.Include = actObj2.Include
 		act.Quiet = actObj2.Quiet
 		act.Parallel = actObj2.Parallel
+		act.Log = actObj2.Log
+		act.Shell = actObj2.Shell
 
 		/**
 		 * Now lets convert acts from map (yaml) to

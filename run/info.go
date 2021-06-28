@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"sync"
 
 	"github.com/nosebit/act/utils"
 )
@@ -40,6 +41,7 @@ const InfoFileName = "info.json"
  */
 const EnvFileName = "env"
 
+
 //############################################################
 // Types
 //############################################################
@@ -64,6 +66,11 @@ type Info struct {
 	ParentId string
 
 	/**
+	 * This is the id of all child acts.
+	 */
+	ChildIds []string
+
+	/**
 	 * Name is a human friendly id assigned by the user when
 	 * running the act. User can then use this name to stop
 	 * o get logs for the act.
@@ -71,32 +78,108 @@ type Info struct {
 	NameId  string
 
 	/**
+	 * This is the main process group id.
+	 */
+	Pgid int
+
+	/**
 	 * List of all process group ids of spawned commands. We
 	 * use this when we need to stop/kill a running act.
 	 */
-	Pgids []int
+	ChildPgids []int
+
+	/**
+	 * Mutex to pevent race conditions of multiple parallel
+	 * commands changing the same info struct.
+	 */
+	mutex sync.Mutex `json:"-"`
 }
 
 //############################################################
 // Info Struct Functions
 //############################################################
 /**
+ * This function going to add a new child act run id to info
+ * and then save info back to file system.
+ */
+func (info *Info) AddChildId(id string) {
+	info.mutex.Lock()
+
+	idx := -1
+
+	for i, val := range info.ChildIds {
+		if val == id {
+			idx = i
+			break
+		}
+	}
+
+	if idx < 0 {
+		info.ChildIds = append(info.ChildIds, id)
+		info.Save()
+	}
+
+	info.mutex.Unlock()
+}
+
+/**
+ * This function removes a child act run id from info and
+ * then save the info back to file system.
+ */
+func (info *Info) RmChildId(id string) {
+	info.mutex.Lock()
+
+	idx := -1
+
+	for i, val := range info.ChildIds {
+		if val == id {
+			idx = i
+			break
+		}
+	}
+
+	if idx >= 0 {
+		info.ChildIds = append(info.ChildIds[:idx], info.ChildIds[idx+1:]...)
+		info.Save()
+	}
+
+	info.mutex.Unlock()
+}
+
+/**
  * This function going to add a new Pgid to info and then save
  * info back to file system.
  */
-func (info *Info) AddPgid(pgid int) {
-	info.Pgids = append(info.Pgids, pgid)
-	info.Save()
+func (info *Info) AddChildPgid(pgid int) {
+	info.mutex.Lock()
+
+	idx := -1
+
+	for i, val := range info.ChildPgids {
+		if val == pgid {
+			idx = i
+			break
+		}
+	}
+
+	if idx < 0 {
+		info.ChildPgids = append(info.ChildPgids, pgid)
+		info.Save()
+	}
+
+	info.mutex.Unlock()
 }
 
 /**
  * This function removes a pgid from info and then save the info
  * back to file system.
  */
-func (info *Info) RmPgid(pgid int) {
+func (info *Info) RmChildPgid(pgid int) {
+	info.mutex.Lock()
+
 	idx := -1
 
-	for i, val := range info.Pgids {
+	for i, val := range info.ChildPgids {
 		if val == pgid {
 			idx = i
 			break
@@ -104,9 +187,11 @@ func (info *Info) RmPgid(pgid int) {
 	}
 
 	if idx >= 0 {
-		info.Pgids = append(info.Pgids[:idx], info.Pgids[idx+1:]...)
+		info.ChildPgids = append(info.ChildPgids[:idx], info.ChildPgids[idx+1:]...)
 		info.Save()
 	}
+
+	info.mutex.Unlock()
 }
 
 /**
@@ -190,6 +275,35 @@ func loadInfoFromFile(jsonPath string) *Info {
 //############################################################
 // Exported Functions
 //############################################################
+/**
+ * This function get call stack from an act id.
+ */
+func GetInfoCallStack(id string) []*Info {
+	allInfos := GetAllInfo()
+
+	// Convert to map for simplicity
+	infoMap := make(map[string]*Info)
+
+	for _, info := range allInfos {
+		infoMap[info.Id] = info
+	}
+
+	var stack []*Info
+	info, hasInfo := infoMap[id]
+
+	for hasInfo {
+		stack = append([]*Info{info}, stack...)
+
+		if info.ParentId != "" {
+			info, hasInfo = infoMap[info.ParentId]
+		} else {
+			hasInfo = false
+		}
+	}
+
+	return stack
+}
+
 
 /**
  * This function going to get all run info.

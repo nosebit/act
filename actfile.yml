@@ -4,3 +4,8 @@ acts:
   install:
     cmds:
       - go install github.com/nosebit/act
+
+  ex:
+    acts:
+      .+:
+        include: "examples/{{.ActName}}.yml"

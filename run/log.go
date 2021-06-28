@@ -17,41 +17,50 @@ import (
 	"time"
 
 	"github.com/logrusorgru/aurora/v3"
+	"github.com/nosebit/act/utils"
 )
 
 //############################################################
 // Types
 //############################################################
 
-type LogStreamer struct {
+/**
+ * This is the main struct which implements io.Writer interface
+ * to be used as stdout/stderr for commands.
+ */
+type LogWriter struct {
+	Detached  bool
+	ctx       *ActRunCtx
 	buf       *bytes.Buffer
 	readLines string
-	// If prefix == stdout, colors green
-	// If prefix == stderr, colors red
-	// Else, prefix is taken as-is, and prepended to anything
-	// you throw at Write()
-	prefix string
-	// if true, saves output in memory
-	record  bool
-	persist string
+	logFile   *os.File
 }
 
-func (s LogStreamer) Write(p []byte) (n int, err error) {
-	if n, err = s.buf.Write(p); err != nil {
+/**
+ * This function implements io.Writer interface.
+ */
+func (l LogWriter) Write(p []byte) (n int, err error) {
+	if n, err = l.buf.Write(p); err != nil {
 		return
 	}
 
-	err = s.OutputLines()
+	err = l.OutputLines()
 	return
 }
 
-func (l *LogStreamer) Close() error {
+/**
+ * This finction close the writer.
+ */
+func (l *LogWriter) Close() error {
 	l.Flush()
 	l.buf = bytes.NewBuffer([]byte(""))
 	return nil
 }
 
-func (l *LogStreamer) Flush() error {
+/**
+ * Flush all buffered bytes to screen/file.
+ */
+func (l *LogWriter) Flush() error {
 	var p []byte
 	if _, err := l.buf.Read(p); err != nil {
 		return err
@@ -61,9 +70,12 @@ func (l *LogStreamer) Flush() error {
 	return nil
 }
 
-func (s *LogStreamer) OutputLines() (err error) {
+/**
+ * This function going to output line by line from buffer.
+ */
+func (l *LogWriter) OutputLines() (err error) {
 	for {
-		line, err := s.buf.ReadString('\n')
+		line, err := l.buf.ReadString('\n')
 		if err == io.EOF {
 			break
 		}
@@ -71,49 +83,47 @@ func (s *LogStreamer) OutputLines() (err error) {
 			return err
 		}
 
-		s.readLines += line
-		s.out(line)
+		l.readLines += line
+		l.out(line)
 	}
 
 	return nil
 }
 
-func (l *LogStreamer) ResetReadLines() {
-	l.readLines = ""
-}
-
-func (l *LogStreamer) ReadLines() string {
-	return l.readLines
-}
-
-func (l *LogStreamer) FlushRecord() string {
-	buffer := l.persist
-	l.persist = ""
-	return buffer
-}
-
-func (l *LogStreamer) out(str string) (err error) {
-	if l.record {
-		l.persist = l.persist + str
-	}
-
+/**
+ * Output string to screen/file.
+ */
+func (l *LogWriter) out(str string) (err error) {
+	// Get time to log.
 	now := time.Now().Format("2006-01-02 15:04:05.000000")
 
 	/**
 	 * If this act process was invoked by other act then
 	 * prevent double info logging.
 	 */
-	prefix := l.prefix
+	logPrefix := l.ctx.RunCtx.Info.NameId
 
-	if prefix != "" {
-		if actParentPrefix, present := os.LookupEnv("ACT_PARENT_ACT"); present {
-			prefix = fmt.Sprintf("%s > %s", actParentPrefix, prefix)
-		}
-
-		fmt.Printf("%s | %s %s", aurora.Yellow(prefix).Bold(), aurora.Cyan(now), str)
-	} else {
-		fmt.Print(str)
+	if l.ctx.ActFile.Namespace != "" {
+		logPrefix = fmt.Sprintf("%s.%s", l.ctx.ActFile.Namespace, l.ctx.Act.Name)
 	}
+
+	var strToLog string
+
+	/**
+	 * If act process is detached from another parent act process then
+	 * we going to prevent add prefix info.
+	 */
+	if l.Detached {
+		strToLog = str
+	} else {
+		strToLog = fmt.Sprintf("%s | %s %s", aurora.Yellow(logPrefix).Bold(), aurora.Cyan(now), str)
+	}
+
+	/**
+	 * Log both to stdout and to file.
+	 */
+	fmt.Print(strToLog)
+	l.logFile.Write([]byte(strToLog))
 
 	return nil
 }
@@ -125,13 +135,19 @@ func (l *LogStreamer) out(str string) (err error) {
 /**
  * This function going to create a new log writer.
  */
-func NewLogWriter(prefix string, record bool) *LogStreamer {
-	streamer := &LogStreamer{
-		buf:     bytes.NewBuffer([]byte("")),
-		prefix:  prefix,
-		record:  record,
-		persist: "",
+func NewLogWriter(ctx *ActRunCtx) *LogWriter {
+	logFilePath := ctx.RunCtx.Info.GetLogFilePath()
+	logFile, err := os.OpenFile(logFilePath, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+
+	if err != nil {
+	  utils.FatalError(fmt.Sprintf("cannot open log file at %s", logFilePath), err)
 	}
 
-	return streamer
+	l := &LogWriter{
+		buf:     bytes.NewBuffer([]byte("")),
+		ctx:     ctx,
+		logFile: logFile,
+	}
+
+	return l
 }

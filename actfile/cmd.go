@@ -17,6 +17,24 @@ import (
 //############################################################
 
 /**
+ * This structure specify a loop for creating multiple similar
+ * commands at once.
+ */
+type CmdLoop struct {
+	/**
+	 * Specify a list of items to be used in the loop.
+	 */
+	Items []string
+
+	/**
+	 * Create items based with a list of files that match specific
+	 * glob pattern.
+	 */
+	Glob string
+}
+
+
+/**
  * The command struct going to contain everything required for
  * the execution of the command.
  */
@@ -64,6 +82,12 @@ type Cmd struct {
 	Script string
 
 	/**
+	 * Set the shell to be used when running commands. By default
+	 * we use bash shell.
+	 */
+	Shell string
+
+	/**
 	 * A command can reference another act to run like this:
 	 *
 	 * ```yaml
@@ -88,6 +112,29 @@ type Cmd struct {
 	 * ```
 	 */
 	Act string
+
+	/**
+	 * When running an act we can specify the actfile from where
+	 * to get the act file.
+	 */
+	From string
+
+	/**
+	 * When running an act we can specify if we want to run it
+	 * as a detached process.
+	 */
+	Detach bool
+
+	/**
+	 * With this we can create loops for executing multiple similar
+	 * commands.
+	 */
+	Loop *CmdLoop
+
+	/**
+	 * This flag allows mismatching act (skiping not found error).
+	 */
+	Mismatch string
 
 	/**
 	 * List of command line arguments to pass over to cmd/act when
@@ -144,19 +191,29 @@ func (cmd *Cmd) UnmarshalYAML(value *yaml.Node) error {
 	 * as Cmd struct but it could be different.
 	 */
 	var cmdObj struct {
-		Cmd    string
-		Script string
-		Act    string
-		Args   []string
-		Quiet  bool
+		Cmd    		string
+		Script 		string
+		Shell     string
+		Act    		string
+		From   		string
+		Detach 		bool
+		Args   		[]string
+		Quiet  		bool
+		Loop   		*CmdLoop
+		Mismatch 	string
 	}
 
 	if err := value.Decode(&cmdObj); err == nil {
 		cmd.Cmd = cmdObj.Cmd
 		cmd.Script = cmdObj.Script
+		cmd.Shell = cmdObj.Shell
 		cmd.Act = cmdObj.Act
+		cmd.From = cmdObj.From
+		cmd.Detach = cmdObj.Detach
 		cmd.Args = cmdObj.Args
 		cmd.Quiet = cmdObj.Quiet
+		cmd.Loop = cmdObj.Loop
+		cmd.Mismatch = cmdObj.Mismatch
 
 		// We let user pass command args together with act name.
 		if cmdObj.Act != "" {
