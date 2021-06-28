@@ -599,6 +599,7 @@ acts:
 
   all:
     parallel: true
+    log: prefixed
     cmds:
       - act: long1
         detach: true
