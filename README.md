@@ -198,7 +198,7 @@ version: 1
 
 acts:
   foo:
-    desc: This is a simple long running act example
+    desc: Act with subacts.
     acts:
       bar:
         cmds:
@@ -210,7 +210,23 @@ which we can run like this:
 ```bash
 act run foo.bar
 ```
+A specicial index subact named `_` can be provided to match the parent act name like this:
 
+```yaml
+# actfile.yml
+version: 1
+
+acts:
+  foo:
+    desc: Act with subacts and index subact.
+    acts:
+      _:
+        cmds: echo "im foo"
+      bar:
+        cmds: echo "im bar subact of foo"
+```
+
+Now we can run `act run foo` to see `im foo` printde to the screen and `act run foo.bar` to see `im bar subact of foo`.
 
 ### Including Acts
 

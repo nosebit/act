@@ -35,7 +35,7 @@ func ActDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 
 	childId, _ := shortid.Generate()
 
-	envars := []string {
+	envars := []string{
 		fmt.Sprintf("ACT_PARENT_RUN_ID=%s", ctx.RunCtx.Info.Id),
 		fmt.Sprintf("ACT_RUN_ID=%s", childId),
 	}
@@ -125,7 +125,7 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		if cmd.Loop.Glob != "" {
 			glob := utils.CompileTemplate(cmd.Loop.Glob, vars)
 			pattern := utils.ResolvePath(utils.GetWd(), glob)
-			paths, err :=  filepath.Glob(pattern)
+			paths, err := filepath.Glob(pattern)
 
 			if err != nil {
 				utils.FatalError("glob error", err)
@@ -143,14 +143,14 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 				vars["LoopItem"] = item
 
 				genCmd := actfile.Cmd{
-					Cmd: utils.CompileTemplate(cmd.Cmd, vars),
-					Act: utils.CompileTemplate(cmd.Act, vars),
-					From: utils.CompileTemplate(cmd.From, vars),
-					Args: cmd.Args,
-					Script: cmd.Script,
-					Detach: cmd.Detach,
+					Cmd:      utils.CompileTemplate(cmd.Cmd, vars),
+					Act:      utils.CompileTemplate(cmd.Act, vars),
+					From:     utils.CompileTemplate(cmd.From, vars),
+					Args:     cmd.Args,
+					Script:   cmd.Script,
+					Detach:   cmd.Detach,
 					Mismatch: cmd.Mismatch,
-					Quiet: cmd.Quiet,
+					Quiet:    cmd.Quiet,
 				}
 
 				cmds = append(cmds, &genCmd)
@@ -228,7 +228,7 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		shArgs = []string{"-c", cmdLine, "--"}
 		shArgs = append(shArgs, ctx.Args...)
 	}
-	
+
 	// Set shell to use in the right precedence order.
 	shell := "bash"
 
@@ -236,7 +236,7 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		shell = ctx.ActFile.Shell
 	}
 
-	if ctx.Act.Shell {
+	if ctx.Act.Shell != "" {
 		shell = ctx.Act.Shell
 	}
 

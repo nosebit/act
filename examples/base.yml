@@ -38,6 +38,8 @@ acts:
   
   act3:
     acts:
+      _:
+        cmds: echo "default act3"
       act31:
         cmds: echo "hello act31"
       act32:

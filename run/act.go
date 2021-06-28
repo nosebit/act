@@ -247,7 +247,7 @@ func (ctx *ActRunCtx) Exec() {
 	 * ```yaml
 	 * # actfile.yml
 	 * version: 1
-	 * 
+	 *
 	 * acts:
 	 *   foo:
 	 *     flags:
@@ -258,7 +258,7 @@ func (ctx *ActRunCtx) Exec() {
 	 *       - echo "name is $FLAG_NAME"
 	 *       - echo "other args are $@"
 	 * ```
-	 * 
+	 *
 	 * and then we can run `act run foo -daemon -name=Bruno arg1 arg2`
 	 * and we should see the following printed to the screen:
 	 *
@@ -345,11 +345,13 @@ func FindActCtx(
 	prevCtx *ActRunCtx,
 	runCtx *RunCtx,
 ) (*ActRunCtx, error) {
-	if len(actNames) == 0 {
-		return nil, nil
-	}
+	var targetActName string
 
-	targetActName := actNames[0]
+	if len(actNames) == 0 {
+		targetActName = "_"
+	} else {
+		targetActName = actNames[0]
+	}
 
 	/**
 	 * Working directory is always relative to actfile location.
