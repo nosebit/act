@@ -1,12 +1,13 @@
 # Act
 
-Act is a task runner and supervisor written in Go which aims to provide the following features:
+Act is a task runner and supervisor tool written in Go which aims to provide the following features:
 
 * process supervision in a project level
 * allow tasks to be written as simple bash scripting if wanted
 * sub tasks which can be invoked with `act run foo.bar` where `bar` is a sub task of `foo` task (tasks are called acts here)
 * dynamically include tasks defined in other locations allowing spliting task definition
 * regex match task names
+* and much more :)
 
 
 ## Instalation
