@@ -35,14 +35,15 @@ func ActDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 
 	childId, _ := shortid.Generate()
 
-	envars := []string{
-		fmt.Sprintf("ACT_PARENT_RUN_ID=%s", ctx.RunCtx.Info.Id),
-		fmt.Sprintf("ACT_RUN_ID=%s", childId),
-	}
-
 	// Set environment vars
 	vars := ctx.MergeVars()
-	envars = append(envars, utils.VarsMapToEnvVars(vars)...)
+
+	// Set some custom vars
+	vars["ACT_PARENT_RUN_ID"] = ctx.RunCtx.Info.Id
+	vars["ACT_RUN_ID"] = childId
+
+	// Create env vars
+	envars := ctx.VarsToEnvVars(vars)
 
 	actNameId := utils.CompileTemplate(cmd.Act, vars)
 	cmdLineArgs := []string{"run", fmt.Sprintf("-f=%s", actFilePath), actNameId}
@@ -50,7 +51,7 @@ func ActDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 
 	shCmd := exec.Command("act", cmdLineArgs...)
 	shCmd.Dir = utils.GetWd()
-	shCmd.Env = append(os.Environ(), envars...)
+	shCmd.Env = envars
 	shCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	// Set logging
@@ -259,22 +260,22 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	godotenv.Load(ctx.RunCtx.Info.GetEnvVarsFilePath())
 
 	/**
-	 * Set environment variables using all available variables.
-	 */
-	envars := utils.VarsMapToEnvVars(vars)
-
-	/**
 	 * Set a special ACT_ENV_FILE variable pointing to the full
 	 * path to env file set on actfile.
 	 */
 	if ctx.ActFile.EnvFilePath != "" {
 		envFilePath := utils.ResolvePath(path.Dir(ctx.ActFile.LocationPath), ctx.ActFile.EnvFilePath)
 
-		envars = append(envars, fmt.Sprintf("ACT_ENV_FILE=%s", envFilePath))
+		vars["ACT_ENV_FILE"] = envFilePath;
 	}
 
+	/**
+	 * Set environment variables using all available variables.
+	 */
+	envars := ctx.VarsToEnvVars(vars)
+
 	// Set all env vars to shell command.
-	shCmd.Env = append(os.Environ(), envars...)
+	shCmd.Env = envars
 
 	/**
 	 * Set output

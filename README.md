@@ -410,6 +410,8 @@ The first command going to check if `MY_VAR` is already set in `ACT_ENV` and if 
 
 **NOTE**: Variables set to `ACT_ENV` going to be persisted as long the act is running. On stop/finish of act execution the main act process going to deleted all variables set. If we need to persist variables see the next section on loading variables from a specific file (not managed by act process itself).
 
+**WARNING**: Remember to always add a line break char `\n` at the end of text you are appending to $ACT_ENV. Otherwise the variable not going to be loaded correctly.
+
 **WARNING**: Be careful with race conditions when reading/write variables to `$ACT_ENV` when running commands in parallel.
 
 
@@ -465,6 +467,9 @@ acts:
 ```
 
 then we can execute `act run foo` multiple times and `MY_VAR` going to be persisted. Note that we ca use `ACT_ENV_FILE` variable to reference our env file.
+
+
+**WARNING**: Remember to always add a line break char `\n` at the end of text you are appending to $ACT_ENV_FILE. Otherwise the variable not going to be loaded correctly.
 
 
 ### Command Line Flags

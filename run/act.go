@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"path"
 	"regexp"
 	"strings"
@@ -116,7 +117,21 @@ func (ctx *ActRunCtx) MergeVars() map[string]string {
 		envFileVars = envars
 	}
 
+	environVars := make(map[string]string)
+
+	// Iterate over environ vars
+	for _, kv := range os.Environ() {
+		parts := strings.Split(kv, "=")
+
+		if len(parts) == 2 {
+			environVars[parts[0]] = parts[1]
+		}
+	}
+
 	varsMapList := []map[string]string{
+		// Variables from the enviornment going to be overriden.
+		environVars,
+
 		// Load vars from files first.
 		envFileVars,
 
@@ -146,6 +161,34 @@ func (ctx *ActRunCtx) MergeVars() map[string]string {
 	}
 
 	return vars
+}
+
+/**
+ * This function convert vars to env vars.
+ */
+func (ctx *ActRunCtx) VarsToEnvVars(vars map[string]string) []string {
+	var envars []string
+	actVarNamesMap := make(map[string]bool)
+
+	for key, _ := range ctx.RunCtx.ActVars {
+		actVarNamesMap[key] = true;
+	}
+
+	for key, _ := range ctx.ActVars {
+		actVarNamesMap[key] = true;
+	}
+
+	for key, val := range vars {
+		theKey := key
+
+		if _, present := actVarNamesMap[key]; present {
+			theKey = utils.CamelToSnakeUpperCase(key)
+		}
+
+		envars = append(envars, fmt.Sprintf("%s=%s", theKey, val))
+	}
+
+	return envars
 }
 
 /**
@@ -201,15 +244,6 @@ func (ctx *ActRunCtx) ExecBeforeAll() {
 
 		if beforeAll != nil && len(beforeAll.Cmds) > 0 {
 			currCtx.ActFile.InitWg.Add(1)
-
-			//var beforeCallId string
-
-			/*if currCtx.ActFile.Namespace != "" {
-				beforeCallId = fmt.Sprintf("%s.before", currCtx.ActFile.Namespace)
-			} else {
-				dir := path.Base(path.Dir(currCtx.ActFile.LocationPath))
-				beforeCallId = fmt.Sprintf("%s.before", dir)
-			}*/
 
 			beforeCallId := fmt.Sprintf("%s::before", currCtx.CallId)
 
