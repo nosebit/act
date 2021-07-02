@@ -48,6 +48,8 @@ jobs:
         run: mkdir -p .releases/linux-amd64
       - name: build
         run: GOOS=linux GOARCH=amd64 go build -o .releases/linux-amd64 -ldflags="-X 'github.com/nosebit/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd.BinOS=v$GOOS' -X 'github.com/nosebit/act/cmd.BinArch=v$GOARCH'" github.com/nosebit/act
+      - name: check releases folder content
+        run: ls .releases/darwin-amd64
       - name: compress release folder
         run: tar czfv .releases/linux-amd64.tar.gz .releases/linux-amd64/
       - name: upload release artifact
@@ -76,7 +78,9 @@ jobs:
       - name: make release folder
         run: mkdir -p .releases/darwin-amd64
       - name: build
-        run: GOOS=darwin GOARCH=amd64 go build -o .releases/linux-amd64 -ldflags="-X 'github.com/nosebit/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd.BinOS=v$GOOS' -X 'github.com/nosebit/act/cmd.BinArch=v$GOARCH'" github.com/nosebit/act
+        run: GOOS=darwin GOARCH=amd64 go build -o .releases/darwin-amd64 -ldflags="-X 'github.com/nosebit/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd.BinOS=v$GOOS' -X 'github.com/nosebit/act/cmd.BinArch=v$GOARCH'" github.com/nosebit/act
+      - name: check releases folder content
+        run: ls .releases/darwin-amd64
       - name: compress release folder
         run: tar czfv .releases/darwin-amd64.tar.gz .releases/darwin-amd64/
       - name: upload release artifact
