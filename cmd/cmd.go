@@ -5,7 +5,9 @@ package cmd
 
 import (
 	"flag"
+	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/nosebit/act/run"
 )
@@ -20,6 +22,13 @@ import (
 var cmdName string
 
 //############################################################
+// Exposed Variables
+//############################################################
+var BinVersion = "development"
+var BinOS = ""
+var BinArch = ""
+
+//############################################################
 // Exposed Functions
 //############################################################
 /**
@@ -30,6 +39,19 @@ func Exec(args []string) {
 	cmdName = args[0]
 
 	switch cmdName {
+	case "version":
+		binOS := BinOS
+		binArch := BinArch
+
+		if binOS == "" {
+			binOS = runtime.GOOS
+		}
+
+		if binArch == "" {
+			binArch = runtime.GOARCH
+		}
+
+		fmt.Printf("act version %s %s/%s\n", BinVersion, binOS, binArch)
 	case "run":
 		run.Exec(args[1:])
 	case "log":

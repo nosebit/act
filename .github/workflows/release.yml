@@ -4,19 +4,51 @@ on:
     branches:
       - main
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: setup node/npm
+        uses: actions/setup-node@v2
+        with:
+          node-version: 12
+      - name: install yarn
+        run: npm install --global yarn
+      - name: install semantic-release
+        run: yarn install
+      - name: semantic release dry run to check next version
+        run: npx semantic-release --dryRun | tee results
+      - name: show semanti release results
+        run: cat results
+      - name: determine next version
+        run: cat results | grep -oP 'Published release \K.*? ' >> version
+      - name: Check next version
+        run: cat version
+      - name: upload version file as an artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: version
+          path: version
   build-linux-amd64:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
         uses: actions/checkout@v2
+      - name: download next version artifact
+        uses: actions/download-artifact@v2
+        name: version
+        path: ./
+      - name: Check next version
+        run: cat version
       - name: setup go
         uses: actions/setup-go@v2
         with:
-          go-version: '^1.13.1'
+          go-version: '^1.16.5'
       - name: make release folder
         run: mkdir -p .releases/linux-amd64
       - name: build
-        run: GOOS=linux GOARCH=amd64 go build -o .releases/linux-amd64 github.com/nosebit/act
+        run: GOOS=linux GOARCH=amd64 go build -o .releases/linux-amd64 -ldflags="-X 'github.com/nosebit/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd.BinOS=v$GOOS' -X 'github.com/nosebit/act/cmd.BinArch=v$GOARCH'" github.com/nosebit/act
       - name: compress release folder
         run: tar czfv .releases/linux-amd64.tar.gz .releases/linux-amd64/
       - name: upload release artifact
@@ -29,14 +61,20 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v2
+      - name: download next version artifact
+        uses: actions/download-artifact@v2
+        name: version
+        path: ./
+      - name: Check next version
+        run: cat version
       - name: setup go
         uses: actions/setup-go@v2
         with:
-          go-version: '^1.13.1'
+          go-version: '^1.16.5'
       - name: make release folder
         run: mkdir -p .releases/darwin-amd64
       - name: build
-        run: GOOS=darwin GOARCH=amd64 go build -o .releases/darwin-amd64 github.com/nosebit/act
+        run: GOOS=darwin GOARCH=amd64 go build -o .releases/linux-amd64 -ldflags="-X 'github.com/nosebit/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd.BinOS=v$GOOS' -X 'github.com/nosebit/act/cmd.BinArch=v$GOARCH'" github.com/nosebit/act
       - name: compress release folder
         run: tar czfv .releases/darwin-amd64.tar.gz .releases/darwin-amd64/
       - name: upload release artifact
