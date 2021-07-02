@@ -27,6 +27,7 @@ var cmdName string
 var BinVersion = "development"
 var BinOS = ""
 var BinArch = ""
+var BinBuildTime = ""
 
 //############################################################
 // Exposed Functions
@@ -51,7 +52,7 @@ func Exec(args []string) {
 			binArch = runtime.GOARCH
 		}
 
-		fmt.Printf("act version %s %s/%s\n", BinVersion, binOS, binArch)
+		fmt.Printf("act version %s %s/%s %s\n", BinVersion, binOS, binArch, BinBuildTime)
 	case "run":
 		run.Exec(args[1:])
 	case "log":

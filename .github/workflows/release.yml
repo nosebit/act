@@ -45,7 +45,7 @@ jobs:
         with:
           go-version: '^1.16.5'
       - name: build
-        run: GOOS=linux GOARCH=amd64 go build -ldflags="-X 'github.com/nosebit/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd.BinOS=v$GOOS' -X 'github.com/nosebit/act/cmd.BinArch=v$GOARCH'" github.com/nosebit/act
+        run: GOOS=linux GOARCH=amd64 go build -ldflags="-X 'github.com/nosebit/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd.BinOS=linux' -X 'github.com/nosebit/act/cmd.BinArch=amd64' -X 'github.com/nosebit/act/cmd.BinBuildTime=$(date)'" github.com/nosebit/act
       - name: compress release folder
         run: tar -czvf act-$(cat version)-linux-amd64.tar.gz ./act
       - name: upload release artifact
@@ -72,7 +72,7 @@ jobs:
         with:
           go-version: '^1.16.5'
       - name: build
-        run: GOOS=darwin GOARCH=amd64 go build -ldflags="-X 'github.com/nosebit/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd.BinOS=v$GOOS' -X 'github.com/nosebit/act/cmd.BinArch=v$GOARCH'" github.com/nosebit/act
+        run: GOOS=darwin GOARCH=amd64 go build -ldflags="-X 'github.com/nosebit/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd.BinOS=darwin' -X 'github.com/nosebit/act/cmd.BinArch=amd64' -X 'github.com/nosebit/act/cmd.BinBuildTime=$(date)'" github.com/nosebit/act
       - name: compress release folder
         run: tar -czvf act-$(cat version)-darwin-amd64.tar.gz ./act
       - name: upload release artifact
