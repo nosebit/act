@@ -22,7 +22,7 @@ jobs:
       - name: upload release artifact
         uses: actions/upload-artifact@v2
         with:
-          name: linux-amd64
+          name: linux-amd64.tar.gz
           path: .releases/linux-amd64.tar.gz
   build-darwin-amd64:
     runs-on: macos-latest
@@ -42,7 +42,7 @@ jobs:
       - name: upload release artifact
         uses: actions/upload-artifact@v2
         with:
-          name: darwin-amd64
+          name: darwin-amd64.tar.gz
           path: .releases/darwin-amd64.tar.gz
   release:
     runs-on: ubuntu-latest
