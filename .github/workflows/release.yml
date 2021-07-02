@@ -18,7 +18,7 @@ jobs:
       - name: install semantic-release
         run: yarn install
       - name: semantic release dry run to check next version
-        run: VERSION_ONLY=true npx semantic-release --no-ci --dry-run
+        run: VERSION_ONLY=true npx semantic-release --no-ci --dry-run --repository-url https://oauth2:${GH_TOKEN}@github.com/nosebit/act.git
       - name: Check next version
         run: cat version
       - name: upload version file as an artifact
