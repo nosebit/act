@@ -16,12 +16,16 @@ Act is a task runner and supervisor tool written in Go which aims to provide the
 
 ### Download Binary
 
-```bash
-# For linux
-wget -q -O - https://github.com/nosebit/act/releases/download/v1.1.1/linux-amd64.tar.gz | tar -xzf - -C /usr/local/bin
+**Linux**
 
-# For MacOs
-wget -q -O - https://github.com/nosebit/act/releases/download/v1.1.1/darwin-amd64.tar.gz | tar -xzf - -C /usr/local/bin
+```bash
+wget -q -O - https://github.com/nosebit/act/releases/download/v1.1.2/act-1.1.2-linux-amd64.tar.gz | tar -xzf - -C /usr/local/bin
+```
+
+**MacOS**
+
+```bash
+wget -q -O - https://github.com/nosebit/act/releases/download/v1.1.2/act-1.1.2-darwin-amd64.tar.gz | tar -xzf - -C /usr/local/bin
 ```
 
 ### From Source

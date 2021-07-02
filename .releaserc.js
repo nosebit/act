@@ -27,8 +27,8 @@ if (process.env.VERSION_ONLY) {
       "replacements": [
         {
           "files": ["README.md"],
-          "from": "https://github.com/nosebit/act/releases/download/[^/]+/",
-          "to": "https://github.com/nosebit/act/releases/download/v${nextRelease.version}/",
+          "from": "https://github.com/nosebit/act/releases/download/[^/]+/act-[^-]+",
+          "to": "https://github.com/nosebit/act/releases/download/v${nextRelease.version}/act-${nextRelease.version}",
           "countMatches": true
         }
       ]
