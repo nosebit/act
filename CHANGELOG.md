@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/nosebit/act/compare/v1.0.0...v1.0.1) (2021-07-02)
+
+
+### Bug Fixes
+
+* set stdin for commands ([a0cb522](https://github.com/nosebit/act/commit/a0cb5227b3291091fb50da53a9608bf750cda26e))
+
 # 1.0.0 (2021-07-02)
 
 
