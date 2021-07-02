@@ -20,4 +20,4 @@ jobs:
       - name: run semantic release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+        run: npx semantic-release --debug --repository-url https://oauth2:${GITHUB_TOKEN}@github.com/nosebit/act.git
