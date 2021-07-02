@@ -1,13 +1,19 @@
-{
-  "branches": ["main"],
-  "plugins": [
+const config = {
+  branches: ["main"],
+  plugins: [
     ["@semantic-release/commit-analyzer", {
       "releaseRules": [
         {"type": "docs", "release": "patch"},
         {"type": "refactor", "release": "patch"},
         {"type": "style", "release": "patch"}
       ]
-    }],
+    }]
+  ]
+};
+
+if (!process.env.VERSION_ONLY) {
+  config.plugins = [
+    ...config.plugins,
     "@semantic-release/release-notes-generator",
     "@semantic-release/changelog",
     ["@google/semantic-release-replace-plugin", {
@@ -29,3 +35,5 @@
     }]
   ]
 }
+
+module.exports = config;
