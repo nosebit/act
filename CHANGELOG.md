@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/nosebit/act/compare/v1.0.3...v1.0.4) (2021-07-02)
+
+
+### Bug Fixes
+
+* upload artifact with same name as file ([8c7aff4](https://github.com/nosebit/act/commit/8c7aff400c9dfcffeb2da5708f5d2cced15e618d))
+
 ## [1.0.3](https://github.com/nosebit/act/compare/v1.0.2...v1.0.3) (2021-07-02)
 
 
