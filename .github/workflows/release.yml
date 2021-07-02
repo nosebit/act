@@ -19,5 +19,5 @@ jobs:
         run: yarn install
       - name: run semantic release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release --debug --repository-url https://oauth2:${GITHUB_TOKEN}@github.com/nosebit/act.git
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npx semantic-release --debug --repository-url https://oauth2:${GH_TOKEN}@github.com/nosebit/act.git
