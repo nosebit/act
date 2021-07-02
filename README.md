@@ -14,6 +14,15 @@ Act is a task runner and supervisor tool written in Go which aims to provide the
 
 @TODO : We need to compile binaries and have a nice way to install act like we have for volta https://volta.sh/.
 
+### Download Binary
+
+```bash
+# For linux
+wget -q -O - https://github.com/nosebit/act/releases/download/v1.0.6/linux-amd64.tar.gz | tar -xzf - -C /usr/local/bin
+
+# For MacOs
+wget -q -O - https://github.com/nosebit/act/releases/download/v1.0.6/darwin-amd64.tar.gz | tar -xzf - -C /usr/local/bin
+```
 
 ### From Source
 
