@@ -19,9 +19,29 @@ jobs:
       - name: build
         run: GOOS=linux GOARCH=amd64 go build -o .releases/linux-amd64 github.com/nosebit/act
       - name: compress release folder
-        run: tar czfv .release/linux-amd64.tar.gz .releases/linux-amd64/
+        run: tar czfv .releases/linux-amd64.tar.gz .releases/linux-amd64/
       - name: upload release artifact
         uses: actions/upload-artifact@v2
         with:
           name: linux-amd64
           path: .releases/linux-amd64.tar.gz
+  release-darwin-amd64:
+    runs-on: macos-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '^1.13.1'
+      - name: make release folder
+        run: mkdir -p .releases/darwin-amd64
+      - name: build
+        run: GOOS=darwin GOARCH=amd64 go build -o .releases/darwin-amd64 github.com/nosebit/act
+      - name: compress release folder
+        run: tar czfv .releases/darwin-amd64.tar.gz .releases/darwin-amd64/
+      - name: upload release artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: darwin-amd64
+          path: .releases/darwin-amd64.tar.gz
