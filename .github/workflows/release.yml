@@ -1,0 +1,23 @@
+name: release
+on:
+  push:
+    branches:
+      - main
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: setup node/npm
+        uses: actions/setup-node@v2
+        with:
+          node-version: 12
+      - name: install yarn
+        run: npm install --global yarn
+      - name: install semantic-release
+        run: yarn install
+      - name: run semantic release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
