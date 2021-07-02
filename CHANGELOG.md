@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/nosebit/act/compare/v1.0.1...v1.0.2) (2021-07-02)
+
+
+### Bug Fixes
+
+* release of binaries ([6516492](https://github.com/nosebit/act/commit/651649263311e34c9cd6b6aeeda383ff4c2a16f1))
+
 ## [1.0.1](https://github.com/nosebit/act/compare/v1.0.0...v1.0.1) (2021-07-02)
 
 
