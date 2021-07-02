@@ -32,6 +32,8 @@ jobs:
           path: version
   build-linux-amd64:
     runs-on: ubuntu-latest
+    needs:
+      - version
     steps:
       - name: checkout
         uses: actions/checkout@v2
@@ -59,6 +61,8 @@ jobs:
           path: .releases/linux-amd64.tar.gz
   build-darwin-amd64:
     runs-on: macos-latest
+    needs:
+      - version
     steps:
       - name: checkout
         uses: actions/checkout@v2
