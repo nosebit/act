@@ -266,7 +266,7 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	if ctx.ActFile.EnvFilePath != "" {
 		envFilePath := utils.ResolvePath(path.Dir(ctx.ActFile.LocationPath), ctx.ActFile.EnvFilePath)
 
-		vars["ACT_ENV_FILE"] = envFilePath;
+		vars["ACT_ENV_FILE"] = envFilePath
 	}
 
 	/**
@@ -305,6 +305,7 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		if !ctx.RunCtx.IsDaemon && logMode == "raw" {
 			shCmd.Stdout = os.Stdout
 			shCmd.Stderr = os.Stderr
+			shCmd.Stdin = os.Stdin
 		} else {
 			/**
 			 * Log writer going to log output with a prefix containing

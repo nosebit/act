@@ -19,7 +19,7 @@ jobs:
       - name: build
         run: GOOS=linux GOARCH=amd64 go build -o .releases/linux-amd64 github.com/nosebit/act
       - name: compress release folder
-        run: tar czfv .release/linux-amd64.tar.gz .release/linux-amd64/
+        run: tar czfv .release/linux-amd64.tar.gz .releases/linux-amd64/
       - name: upload release artifact
         uses: actions/upload-artifact@v2
         with:
