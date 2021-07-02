@@ -15,7 +15,7 @@
         {
           "files": ["README.md"],
           "from": "https://github.com/nosebit/act/releases/download/[^/]+/",
-          "to": "https://github.com/nosebit/act/releases/download/${nextRelease.version}/",
+          "to": "https://github.com/nosebit/act/releases/download/v${nextRelease.version}/",
           "countMatches": true
         }
       ]
