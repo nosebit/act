@@ -11,7 +11,14 @@ const config = {
   ]
 };
 
-if (!process.env.VERSION_ONLY) {
+if (process.env.VERSION_ONLY) {
+  config.plugins = [
+    ...config.plugins,
+    ["@semantic-release/exec", {
+      "verifyReleaseCmd": "echo ${nextRelease.version} > version"
+    }]
+  ];
+} else {
   config.plugins = [
     ...config.plugins,
     "@semantic-release/release-notes-generator",

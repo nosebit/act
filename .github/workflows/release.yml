@@ -18,11 +18,7 @@ jobs:
       - name: install semantic-release
         run: yarn install
       - name: semantic release dry run to check next version
-        run: VERSION_ONLY=true npx semantic-release --dryRun | tee results
-      - name: show semantic release results
-        run: cat results
-      - name: determine next version
-        run: cat results | grep -oP 'Published release \K.*? ' >> version
+        run: VERSION_ONLY=true npx semantic-release
       - name: Check next version
         run: cat version
       - name: upload version file as an artifact
