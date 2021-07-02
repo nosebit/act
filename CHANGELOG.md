@@ -1,3 +1,10 @@
+## [1.0.5](https://github.com/nosebit/act/compare/v1.0.4...v1.0.5) (2021-07-02)
+
+
+### Bug Fixes
+
+* change semantic release config to expose all assets in release page ([347f527](https://github.com/nosebit/act/commit/347f527db4504f66aeab0721dd27c1cd0bfde4af))
+
 ## [1.0.4](https://github.com/nosebit/act/compare/v1.0.3...v1.0.4) (2021-07-02)
 
 
