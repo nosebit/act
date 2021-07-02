@@ -1,3 +1,10 @@
+## [1.0.6](https://github.com/nosebit/act/compare/v1.0.5...v1.0.6) (2021-07-02)
+
+
+### Bug Fixes
+
+* artifact name and tar.gz glob for semantic release ([c84935d](https://github.com/nosebit/act/commit/c84935dfbfa27266a6f8bad87ae5e0340de0dbab))
+
 ## [1.0.5](https://github.com/nosebit/act/compare/v1.0.4...v1.0.5) (2021-07-02)
 
 
