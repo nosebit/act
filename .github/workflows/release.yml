@@ -49,7 +49,7 @@ jobs:
       - name: build
         run: GOOS=linux GOARCH=amd64 go build -o .releases/linux-amd64 -ldflags="-X 'github.com/nosebit/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd.BinOS=v$GOOS' -X 'github.com/nosebit/act/cmd.BinArch=v$GOARCH'" github.com/nosebit/act
       - name: check releases folder content
-        run: ls .releases/darwin-amd64
+        run: ls .releases/linux-amd64
       - name: compress release folder
         run: tar czfv .releases/linux-amd64.tar.gz .releases/linux-amd64/
       - name: upload release artifact
