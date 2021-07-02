@@ -1,3 +1,11 @@
+## [1.0.3](https://github.com/nosebit/act/compare/v1.0.2...v1.0.3) (2021-07-02)
+
+
+### Bug Fixes
+
+* gh actions config file syntax ([c3acfed](https://github.com/nosebit/act/commit/c3acfedf94f0932c975225b91be0ab73aa1025fd))
+* show binaries in release page ([6b215ff](https://github.com/nosebit/act/commit/6b215ffd07492b1afb860f4067d6a1b03e7f991f))
+
 ## [1.0.2](https://github.com/nosebit/act/compare/v1.0.1...v1.0.2) (2021-07-02)
 
 
