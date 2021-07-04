@@ -1,6 +1,33 @@
 version: 1
 
 acts:
+  hello:
+    cmds:
+      - echo "hellow"
+
+  git:
+    acts:
+      commit:
+        acts:
+          _:
+            cmds: npx cz
+          all:
+            cmds:
+              - git add .
+              - act: commit
+      hooks:
+        cmds:
+          - act: log Installing git hooks
+          - |
+            basedir=$PWD
+            mkdir -p .git/hooks
+            rm -f .git/hooks/*
+            chmod u+x ./hooks/*
+
+            for f in $(ls ./hooks); do
+              ln -s ../../hooks/$f $basedir/.git/hooks/$f
+            done
+
   install:
     cmds:
       - go install github.com/nosebit/act

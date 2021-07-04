@@ -2,7 +2,6 @@ package run
 
 import (
 	"fmt"
-	//"io"
 	"os"
 	"os/exec"
 	"path"
@@ -250,10 +249,6 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	// Command to spawn.
 	shCmd := exec.Command(shell, shArgs...)
 
-	if shCmd.SysProcAttr == nil {
-		shCmd.SysProcAttr = &syscall.SysProcAttr{}
-	}
-
 	/**
 	 * We going to run the scrip relative to the folder which contains
 	 * the actfile where we actually matched the act to run.
@@ -284,6 +279,21 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	shCmd.Env = envars
 
 	/**
+	 * We ask go to create a new process group for the command we
+	 * going to execute. With that we can safelly kill all process
+	 * group (i.e., all descendent process) withou killing the main
+	 * act process which is spawning the command. If we don't ask go
+	 * to create a fresh process group then by default the spawned
+	 * process going to be assigned to the same process group as the
+	 * main act process and if we kill it we going to commit suicide.
+	 *
+	 * Further explanations in:
+	 *
+	 * https://medium.com/@felixge/killing-a-child-process-and-all-of-its-children-in-go-54079af94773
+	 */
+	shCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	/**
 	 * Set output
 	 */
 	if !ctx.RunCtx.Quiet && !ctx.Act.Quiet && !cmd.Quiet {
@@ -309,12 +319,10 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		}
 
 		if !ctx.RunCtx.IsDaemon && logMode == "raw" {
-			shCmd.SysProcAttr.Setctty = true
-			shCmd.SysProcAttr.Setsid = true
-
 			shCmd.Stdout = os.Stdout
 			shCmd.Stderr = os.Stderr
 			shCmd.Stdin = os.Stdin
+
 		} else {
 			/**
 			 * Log writer going to log output with a prefix containing
@@ -329,20 +337,6 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		}
 	}
 
-	/**
-	 * We ask go to create a new process group for the command we
-	 * going to execute. With that we can safelly kill all process
-	 * group (i.e., all descendent process) withou killing the main
-	 * act process which is spawning the command. If we don't ask go
-	 * to create a fresh process group then by default the spawned
-	 * process going to be assigned to the same process group as the
-	 * main act process and if we kill it we going to commit suicide.
-	 *
-	 * Further explanations in:
-	 *
-	 * https://medium.com/@felixge/killing-a-child-process-and-all-of-its-children-in-go-54079af94773
-	 */
-	shCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	// Start act execution
 	shCmd.Start()
@@ -379,10 +373,17 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
       // defined for both Unix and Windows and in both cases has
       // an ExitStatus() method with the same signature.
       if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-        utils.FatalErrorWithCode(status.ExitStatus(), errMsg, err)
-        //os.Exit(status.ExitStatus())
+      	if ctx.Act.Parallel {
+      		utils.LogError(errMsg, err)
+      	} else {
+      		utils.FatalErrorWithCode(status.ExitStatus(), errMsg, err)
+      	}
       } else {
-      	utils.FatalError(errMsg, err)
+      	if ctx.Act.Parallel {
+      		utils.LogError(errMsg, err)
+      	} else {
+      		utils.FatalError(errMsg, err)
+      	}
       }
     }
   }

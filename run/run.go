@@ -112,7 +112,10 @@ func KillChildren(info *Info) {
 
 				// Lets kill all running commands
 				for _, pgid := range childInfo.ChildPgids {
-					syscall.Kill(-pgid, syscall.SIGKILL)
+					// Prevent killing in the same group
+					if pgid != info.Pgid {
+						syscall.Kill(-pgid, syscall.SIGKILL)
+					}
 				}
 
 				childInfo.RmDataDir()
@@ -152,7 +155,10 @@ func KillParentsIfNeeded(info *Info) {
 			 * Otherwise parent process is done, so let's kill it and
 			 * keep going killing parents.
 			 */
-			syscall.Kill(-parentInfo.Pgid, syscall.SIGKILL)
+			// Prevent killing in the same group
+			if parentInfo.Pgid != info.Pgid {
+				syscall.Kill(-parentInfo.Pgid, syscall.SIGKILL)
+			}
 			parentInfo.RmDataDir()
 
 			childInfo = parentInfo
@@ -173,10 +179,12 @@ func (ctx *RunCtx) Kill() {
 
 	// Kill all running commands.
 	for _, pgid := range ctx.Info.ChildPgids {
-		err := syscall.Kill(-pgid, syscall.SIGKILL)
+		if pgid != ctx.Info.Pgid {
+			err := syscall.Kill(-pgid, syscall.SIGKILL)
 
-		if err != nil {
-			utils.FatalError(fmt.Sprintf("could not kill process pgid=%d", pgid), err)
+			if err != nil {
+				utils.FatalError(fmt.Sprintf("could not kill process pgid=%d", pgid), err)
+			}
 		}
 	}
 
