@@ -54,6 +54,7 @@ func ActDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	shCmd.Env = envars
 	shCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
+
 	// Set logging
 	if !ctx.RunCtx.Quiet && !ctx.Act.Quiet && !cmd.Quiet {
 		l := NewLogWriter(ctx)
@@ -218,13 +219,14 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	 * Set the command to run (script or command line).
 	 */
 	var shArgs []string
+	var cmdLine string
 
 	if cmd.Script != "" {
-		cmdLine := utils.CompileTemplate(cmd.Script, vars)
+		cmdLine = utils.CompileTemplate(cmd.Script, vars)
 
 		shArgs = append([]string{cmdLine}, ctx.Args...)
 	} else {
-		cmdLine := utils.CompileTemplate(cmd.Cmd, vars)
+		cmdLine = utils.CompileTemplate(cmd.Cmd, vars)
 
 		shArgs = []string{"-c", cmdLine, "--"}
 		shArgs = append(shArgs, ctx.Args...)
@@ -247,6 +249,10 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 
 	// Command to spawn.
 	shCmd := exec.Command(shell, shArgs...)
+
+	if shCmd.SysProcAttr == nil {
+		shCmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
 
 	/**
 	 * We going to run the scrip relative to the folder which contains
@@ -303,6 +309,9 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		}
 
 		if !ctx.RunCtx.IsDaemon && logMode == "raw" {
+			shCmd.SysProcAttr.Setctty = true
+			shCmd.SysProcAttr.Setsid = true
+
 			shCmd.Stdout = os.Stdout
 			shCmd.Stderr = os.Stderr
 			shCmd.Stdin = os.Stdin
@@ -358,8 +367,25 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	// Save to run context info file
 	ctx.RunCtx.Info.AddChildPgid(pgid)
 
-	// Wait finalization
-	shCmd.Wait()
+	// Wait finalization and get error code
+	if err := shCmd.Wait(); err != nil {
+    if exiterr, ok := err.(*exec.ExitError); ok {
+    	errMsg := fmt.Sprintf("command '%s' failed", cmdLine)
+
+      // The program has exited with an exit code != 0
+
+      // This works on both Unix and Windows. Although package
+      // syscall is generally platform dependent, WaitStatus is
+      // defined for both Unix and Windows and in both cases has
+      // an ExitStatus() method with the same signature.
+      if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+        utils.FatalErrorWithCode(status.ExitStatus(), errMsg, err)
+        //os.Exit(status.ExitStatus())
+      } else {
+      	utils.FatalError(errMsg, err)
+      }
+    }
+  }
 
 	// Remove pgid now
 	if !ctx.RunCtx.IsKilling {

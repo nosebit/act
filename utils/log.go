@@ -63,6 +63,14 @@ func FatalError(args ...interface{}) {
 	os.Exit(1)
 }
 
+/**
+ * This function going to handle fatal error with code.
+ */
+func FatalErrorWithCode(code int, args ...interface{}) {
+	LogError(args...)
+	os.Exit(code)
+}
+
 //############################################################
 // Lifecycle Functions
 //############################################################

@@ -50,5 +50,11 @@ acts:
       - act: act2
       - act: act1 -test
 
+
+  error:
+    cmds:
+      - echo "hello"
+      - exit 1
+
   child:
     include: child/actfile.yml
