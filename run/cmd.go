@@ -21,11 +21,38 @@ import (
 //############################################################
 
 /**
+ * This function get log mode.
+ */
+func getLogMode(cmd *actfile.Cmd, ctx *ActRunCtx) string {
+	/**
+	 * Set the log mode. By default log mode is `raw` and therefore we going
+	 * to send all logs directly to stdout without any prefixing containing
+	 * act info. If we want to prepend log lines with a prefix containing
+	 * act name id and timestamp we can set log mode as `prefixed`.
+	 */
+	logMode := "raw"
+
+	if ctx.ActFile.Log != "" {
+		logMode = ctx.ActFile.Log
+	}
+
+	if ctx.Act.Log != "" {
+		logMode = ctx.Act.Log
+	}
+
+	if ctx.RunCtx.Log != "" {
+		logMode = ctx.RunCtx.Log
+	}
+
+	return logMode
+}
+
+/**
  * This function going to run an act in detached mode. In this
  * mode the act going to be run as separate act process which
  * can be managed independently (stopped/logged).
  */
-func ActDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
+func actDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	actFilePath := ctx.ActFile.LocationPath
 
 	if cmd.From != "" {
@@ -44,15 +71,18 @@ func ActDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	// Create env vars
 	envars := ctx.VarsToEnvVars(vars)
 
+	logMode := getLogMode(cmd, ctx)
+
 	actNameId := utils.CompileTemplate(cmd.Act, vars)
-	cmdLineArgs := []string{"run", fmt.Sprintf("-f=%s", actFilePath), actNameId}
+	cmdLineArgs := []string{"run", fmt.Sprintf("-f=%s", actFilePath), fmt.Sprintf("-l=%s", logMode), actNameId}
 	cmdLineArgs = append(cmdLineArgs, cmd.Args...)
 
 	shCmd := exec.Command("act", cmdLineArgs...)
 	shCmd.Dir = utils.GetWd()
 	shCmd.Env = envars
-	shCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
+	// Ensure we create a new session for the created process (this mean a new pgid).
+	shCmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
 	// Set logging
 	if !ctx.RunCtx.Quiet && !ctx.Act.Quiet && !cmd.Quiet {
@@ -75,7 +105,7 @@ func ActDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	shCmd.Start()
 
 	// Add child id
-	ctx.RunCtx.Info.AddChildId(childId)
+	ctx.RunCtx.Info.AddChildActId(childId)
 
 	// Wait child process finalization.
 	shCmd.Wait()
@@ -99,6 +129,10 @@ func CmdsExec(cmds []*actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 			go CmdExec(cmd, ctx, wg)
 		} else {
 			CmdExec(cmd, ctx, nil)
+		}
+
+		if ctx.RunCtx.IsKilling {
+			break
 		}
 	}
 }
@@ -173,7 +207,7 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		 * (detached mode) then let's spawn the process.
 		 */
 		if cmd.Detach {
-			ActDetachExec(cmd, ctx, wg)
+			actDetachExec(cmd, ctx, wg)
 			return
 		}
 
@@ -290,8 +324,15 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	 * Further explanations in:
 	 *
 	 * https://medium.com/@felixge/killing-a-child-process-and-all-of-its-children-in-go-54079af94773
+	 *
+	 * @NOTE : For some reason using SysProcAttr.Setpgid give us some
+	 * weird behaviors at least in MacOS. Using SysProcAttr.Setsid seems
+	 * to have the same end result (creating different pgid for child
+	 * process). Based on the following:
+	 *
+	 * https://stackoverflow.com/questions/43364958/start-command-with-new-process-group-id-golang
 	 */
-	shCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	shCmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
 	/**
 	 * Set output
@@ -304,25 +345,12 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		 * act info. If we want to prepend log lines with a prefix containing
 		 * act name id and timestamp we can set log mode as `prefixed`.
 		 */
-		logMode := "raw"
-
-		if ctx.ActFile.Log != "" {
-			logMode = ctx.ActFile.Log
-		}
-
-		if ctx.Act.Log != "" {
-			logMode = ctx.Act.Log
-		}
-
-		if ctx.RunCtx.Log != "" {
-			logMode = ctx.RunCtx.Log
-		}
+		logMode := getLogMode(cmd, ctx)
 
 		if !ctx.RunCtx.IsDaemon && logMode == "raw" {
 			shCmd.Stdout = os.Stdout
 			shCmd.Stderr = os.Stderr
 			shCmd.Stdin = os.Stdin
-
 		} else {
 			/**
 			 * Log writer going to log output with a prefix containing
@@ -336,7 +364,6 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 			shCmd.Stderr = l
 		}
 	}
-
 
 	// Start act execution
 	shCmd.Start()
@@ -356,41 +383,50 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		utils.FatalError(fmt.Sprintf("could not get pgid for pid=%d", pid), err)
 	}
 
-	ctx.Pgids = append(ctx.Pgids, pgid)
-
 	// Save to run context info file
-	ctx.RunCtx.Info.AddChildPgid(pgid)
+	ctx.RunCtx.Info.AddCmdPgid(pgid)
 
 	// Wait finalization and get error code
 	if err := shCmd.Wait(); err != nil {
-    if exiterr, ok := err.(*exec.ExitError); ok {
-    	errMsg := fmt.Sprintf("command '%s' failed", cmdLine)
+		if exiterr, ok := err.(*exec.ExitError); ok {
+			errMsg := fmt.Sprintf("command '%s' failed", cmdLine)
 
-      // The program has exited with an exit code != 0
+			/**
+			 * Program exited with exit code other then 0 (which means
+			 * an error happened). This works both on Unix and Windows.
+			 *
+			 * Code got from:
+			 *
+			 * https://stackoverflow.com/questions/10385551/get-exit-code-go
+			 */
+			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+				exitStatus := status.ExitStatus()
 
-      // This works on both Unix and Windows. Although package
-      // syscall is generally platform dependent, WaitStatus is
-      // defined for both Unix and Windows and in both cases has
-      // an ExitStatus() method with the same signature.
-      if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-      	if ctx.Act.Parallel {
-      		utils.LogError(errMsg, err)
-      	} else {
-      		utils.FatalErrorWithCode(status.ExitStatus(), errMsg, err)
-      	}
-      } else {
-      	if ctx.Act.Parallel {
-      		utils.LogError(errMsg, err)
-      	} else {
-      		utils.FatalError(errMsg, err)
-      	}
-      }
-    }
-  }
+				if exitStatus > 0 {
+					/**
+					 * We don't want to exit from main process when we are
+					 * running commands in parallel but we want to get
+					 * notified about command failure.
+					 */
+					if ctx.Act.Parallel {
+						utils.LogError(errMsg, err)
+					} else {
+						utils.FatalErrorWithCode(status.ExitStatus(), errMsg, err)
+					}
+				}
+			} else {
+				if ctx.Act.Parallel {
+					utils.LogError(errMsg, err)
+				} else {
+					utils.FatalError(errMsg, err)
+				}
+			}
+		}
+	}
 
 	// Remove pgid now
 	if !ctx.RunCtx.IsKilling {
-		ctx.RunCtx.Info.RmChildPgid(pgid)
+		ctx.RunCtx.Info.RmCmdPgid(pgid)
 	}
 
 	if wg != nil {

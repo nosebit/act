@@ -1,8 +1,8 @@
 /**
  * The implementation here was totally inspired by the following:
- * 
+ *
  * https://kvz.io/prefix-streaming-stdout-and-stderr-in-golang.html
- * 
+ *
  * @TODO : We need to refactor this to remove record/persist.
  * @TODO : We should add more comments here and jsdocs.
  */
@@ -123,7 +123,10 @@ func (l *LogWriter) out(str string) (err error) {
 	 * Log both to stdout and to file.
 	 */
 	fmt.Print(strToLog)
-	l.logFile.Write([]byte(strToLog))
+
+	if l.Detached {
+		l.logFile.Write([]byte(strToLog))
+	}
 
 	return nil
 }
@@ -137,10 +140,10 @@ func (l *LogWriter) out(str string) (err error) {
  */
 func NewLogWriter(ctx *ActRunCtx) *LogWriter {
 	logFilePath := ctx.RunCtx.Info.GetLogFilePath()
-	logFile, err := os.OpenFile(logFilePath, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	logFile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 
 	if err != nil {
-	  utils.FatalError(fmt.Sprintf("cannot open log file at %s", logFilePath), err)
+		utils.FatalError(fmt.Sprintf("cannot open log file at %s", logFilePath), err)
 	}
 
 	l := &LogWriter{
