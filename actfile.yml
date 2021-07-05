@@ -1,10 +1,6 @@
 version: 1
 
 acts:
-  hello:
-    cmds:
-      - echo "hellow"
-
   git:
     acts:
       commit:
