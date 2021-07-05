@@ -16,8 +16,8 @@ import (
 	 * packeges.
 	 */
 
-	"github.com/nosebit/act/cmd"
-	"github.com/nosebit/act/utils"
+	"github.com/nosebit/act/cmd/act/cmd"
+	"github.com/nosebit/act/cmd/act/utils"
 )
 
 /**

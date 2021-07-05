@@ -9,7 +9,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/nosebit/act/run"
+	"github.com/nosebit/act/cmd/act/run"
 )
 
 //############################################################

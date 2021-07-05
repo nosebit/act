@@ -8,8 +8,8 @@ package cmd
 import (
 	"flag"
 
-	"github.com/nosebit/act/run"
-	"github.com/nosebit/act/utils"
+	"github.com/nosebit/act/cmd/act/run"
+	"github.com/nosebit/act/cmd/act/utils"
 )
 
 //############################################################

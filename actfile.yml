@@ -26,7 +26,7 @@ acts:
 
   install:
     cmds:
-      - go install github.com/nosebit/act
+      - go install ./...
 
   ex:
     acts:

@@ -10,7 +10,7 @@ import (
 	"os"
 
 	"github.com/logrusorgru/aurora/v3"
-	"github.com/nosebit/act/run"
+	"github.com/nosebit/act/cmd/act/run"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -30,11 +30,11 @@ func ListCmdExec() {
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-  table.SetHeader([]string{"Id", "Name"})
+	table.SetHeader([]string{"Id", "Name"})
 
 	for _, info := range infos {
 		table.Append([]string{info.Id, info.NameId})
 	}
 
-  table.Render()
+	table.Render()
 }

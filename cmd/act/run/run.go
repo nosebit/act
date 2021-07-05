@@ -9,8 +9,8 @@ import (
 	"syscall"
 
 	"github.com/logrusorgru/aurora/v3"
-	"github.com/nosebit/act/actfile"
-	"github.com/nosebit/act/utils"
+	"github.com/nosebit/act/cmd/act/actfile"
+	"github.com/nosebit/act/cmd/act/utils"
 	"github.com/teris-io/shortid"
 )
 

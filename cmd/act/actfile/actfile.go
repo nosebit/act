@@ -10,7 +10,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/nosebit/act/utils"
+	"github.com/nosebit/act/cmd/act/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -96,13 +96,13 @@ type ActFile struct {
  */
 func (actFile *ActFile) UnmarshalYAML(value *yaml.Node) error {
 	var actFileObj struct {
-		Version   		string
-		Namespace 		string
-		BeforeAll 		*Act `yaml:"before-all"`
-		Acts      		yaml.Node
-		EnvFilePath   string `yaml:"envfile"`
-		Log      			string
-		Shell         string
+		Version     string
+		Namespace   string
+		BeforeAll   *Act `yaml:"before-all"`
+		Acts        yaml.Node
+		EnvFilePath string `yaml:"envfile"`
+		Log         string
+		Shell       string
 	}
 
 	if err := value.Decode(&actFileObj); err == nil {

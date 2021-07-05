@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/logrusorgru/aurora/v3"
-	"github.com/nosebit/act/utils"
+	"github.com/nosebit/act/cmd/act/utils"
 )
 
 //############################################################

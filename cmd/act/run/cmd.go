@@ -11,8 +11,8 @@ import (
 	"syscall"
 
 	"github.com/joho/godotenv"
-	"github.com/nosebit/act/actfile"
-	"github.com/nosebit/act/utils"
+	"github.com/nosebit/act/cmd/act/actfile"
+	"github.com/nosebit/act/cmd/act/utils"
 	"github.com/teris-io/shortid"
 )
 
@@ -23,7 +23,7 @@ import (
 /**
  * This function get log mode.
  */
-func getLogMode(cmd *actfile.Cmd, ctx *ActRunCtx) string {
+func getLogMode(_ *actfile.Cmd, ctx *ActRunCtx) string {
 	/**
 	 * Set the log mode. By default log mode is `raw` and therefore we going
 	 * to send all logs directly to stdout without any prefixing containing
