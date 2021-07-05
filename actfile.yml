@@ -3,14 +3,14 @@ version: 1
 acts:
   git:
     acts:
-      commit:
+      cz:
         acts:
           _:
             cmds: npx cz
           all:
             cmds:
               - git add .
-              - act: commit
+              - act: git.cz
       hooks:
         cmds:
           - act: log Installing git hooks
