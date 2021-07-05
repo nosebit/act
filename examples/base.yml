@@ -48,13 +48,16 @@ acts:
   act4:
     cmds:
       - act: act2
-      - act: act1 -test
-
+      - act: act1 -name=Bruno hello
 
   error:
     cmds:
       - echo "hello"
       - exit 1
+
+  vim:
+    cmds:
+      - vim
 
   child:
     include: child/actfile.yml
