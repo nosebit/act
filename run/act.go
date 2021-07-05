@@ -56,11 +56,6 @@ type ActRunCtx struct {
 	ParallelExec bool
 
 	/**
-	 * List of process groupd ids created by this act.
-	 */
-	Pgids []int
-
-	/**
 	 * List of cli flag values passed by the user.
 	 */
 	FlagVals map[string]string
@@ -171,17 +166,21 @@ func (ctx *ActRunCtx) VarsToEnvVars(vars map[string]string) []string {
 	actVarNamesMap := make(map[string]bool)
 
 	for key, _ := range ctx.RunCtx.ActVars {
-		actVarNamesMap[key] = true;
+		actVarNamesMap[key] = true
 	}
 
 	for key, _ := range ctx.ActVars {
-		actVarNamesMap[key] = true;
+		actVarNamesMap[key] = true
 	}
 
 	for key, val := range vars {
 		theKey := key
 
 		if _, present := actVarNamesMap[key]; present {
+			theKey = utils.CamelToSnakeUpperCase(key)
+		}
+
+		if _, present := ctx.FlagVals[key]; present {
 			theKey = utils.CamelToSnakeUpperCase(key)
 		}
 
