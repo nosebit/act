@@ -35,7 +35,7 @@ First you need to have go >= 1.16 installed in your machine. Then after cloning 
 ```bash
 cd /path/to/act/folder
 
-GOROOT=/usr/local/bin go install github.com/nosebit/act
+GOROOT=/usr/local/bin go install ./...
 ```
 
 Feel free to change GOROOT to whatever destination you want.
@@ -60,6 +60,12 @@ and then we run the act with the following command:
 
 ```bash
 act run foo
+```
+
+or shortly we can do:
+
+```bash
+actr foo
 ```
 
 If we need to specify a diferent actfile to be used we can do it like this:
