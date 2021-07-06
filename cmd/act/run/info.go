@@ -278,11 +278,7 @@ func (info *Info) Save() {
 func (info *Info) RmDataDir() {
 	dataDirPath := info.GetDataDirPath()
 
-	err := os.RemoveAll(dataDirPath)
-
-	if err != nil {
-		utils.FatalError(fmt.Sprintf("could not remove dir %s", dataDirPath), err)
-	}
+	os.RemoveAll(dataDirPath)
 }
 
 /**

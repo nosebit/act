@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"syscall"
 
 	"github.com/logrusorgru/aurora/v3"
 )
@@ -18,6 +19,31 @@ var (
 	debugLogger *log.Logger
 	infoLogger  *log.Logger
 )
+
+//############################################################
+// Exposed Variables
+//############################################################
+var ExitCode int = 0
+var KillInProgress bool
+
+//############################################################
+// Internal Functions
+//############################################################
+/**
+ * This function going to send a signal to current process to
+ * exit gracefully.
+ */
+func exitGracefully() {
+	if KillInProgress {
+		return
+	}
+
+	KillInProgress = true
+	pid := os.Getegid()
+
+	// Send kill signal.
+	syscall.Kill(pid, syscall.SIGQUIT)
+}
 
 //############################################################
 // Exposed Functions
@@ -60,7 +86,8 @@ func LogInfo(args ...interface{}) {
  */
 func FatalError(args ...interface{}) {
 	LogError(args...)
-	os.Exit(1)
+	ExitCode = 1
+	exitGracefully()
 }
 
 /**
@@ -68,7 +95,8 @@ func FatalError(args ...interface{}) {
  */
 func FatalErrorWithCode(code int, args ...interface{}) {
 	LogError(args...)
-	os.Exit(code)
+	ExitCode = code
+	exitGracefully()
 }
 
 //############################################################

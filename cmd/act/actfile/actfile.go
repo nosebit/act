@@ -38,7 +38,7 @@ type ActFile struct {
 	 * This is a list of commands to be run before execution
 	 * of any act.
 	 */
-	BeforeAll *Act
+	BeforeAll *ActExecStage
 
 	/**
 	 * The user specifies one or more acts in the actfile. Each
@@ -98,7 +98,7 @@ func (actFile *ActFile) UnmarshalYAML(value *yaml.Node) error {
 	var actFileObj struct {
 		Version     string
 		Namespace   string
-		BeforeAll   *Act `yaml:"before-all"`
+		BeforeAll   *ActExecStage `yaml:"before-all"`
 		Acts        yaml.Node
 		EnvFilePath string `yaml:"envfile"`
 		Log         string

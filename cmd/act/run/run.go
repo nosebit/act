@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/logrusorgru/aurora/v3"
@@ -68,6 +69,11 @@ type RunCtx struct {
 	IsKilling bool
 
 	/**
+	 * Flag indicating if we are running cleaning before exiting.
+	 */
+	IsCleaning bool
+
+	/**
 	 * Flag indicating if we are running the process as a
 	 * daemon in the background.
 	 */
@@ -98,12 +104,16 @@ func (ctx *RunCtx) Print() {
 //############################################################
 // Internal Variables
 //############################################################
+var cleaning bool
 var runCtx *RunCtx
 
 //############################################################
 // Internal Functions
 //############################################################
-func CreateRunCtx(args []string, actFile *actfile.ActFile) *RunCtx {
+/**
+ * This function creates a new run context.
+ */
+func createRunCtx(args []string, actFile *actfile.ActFile) *RunCtx {
 	nameId := args[0]
 	actNames := strings.Split(nameId, ActCallIdSeparator)
 
@@ -184,10 +194,24 @@ func CreateRunCtx(args []string, actFile *actfile.ActFile) *RunCtx {
 		utils.FatalError(err)
 	}
 
-	ctx.ActCtx = actCtx
-	ctx.ActCtx.Args = ctx.Args
+	if actCtx != nil {
+		ctx.ActCtx = actCtx
+		ctx.ActCtx.Args = ctx.Args
+	}
 
 	return ctx
+}
+
+/**
+ * This function going to run teardown commands of currently
+ * running act upon exit.
+ *
+ * @TODO: We need to run teardown cmds of all running acts.
+ */
+func teardown(wg *sync.WaitGroup) {
+	if runCtx != nil && runCtx.ActCtx.Act.Teardown != nil {
+		StageCmdsExec(runCtx.ActCtx.Act.Teardown, runCtx.ActCtx, wg)
+	}
 }
 
 //############################################################
@@ -246,7 +270,7 @@ func Exec(args []string) {
 	actFile := actfile.ReadActFile(actFilePath)
 
 	// Build run context
-	runCtx = CreateRunCtx(cmdArgs, actFile)
+	runCtx = createRunCtx(cmdArgs, actFile)
 
 	// Set quiet logs from command line
 	runCtx.Quiet = *quietPtr
@@ -298,7 +322,7 @@ func Exec(args []string) {
 		}
 
 		fmt.Printf("😎 started with id %s\n", aurora.Green(runCtx.Info.Id).Bold())
-	} else {
+	} else if runCtx.ActCtx != nil {
 		/**
 		 * We save info file just when we are running in not daemon mode because when we
 		 * run in daemon mode the only thing act going to do is to spawn another act run
@@ -309,8 +333,15 @@ func Exec(args []string) {
 		// Now run the matched act
 		runCtx.ActCtx.Exec()
 
-		// Now that we are done lets clean
-		runCtx.Info.RmDataDir()
+		if !cleaning {
+			// Teardown
+			wg := &sync.WaitGroup{}
+			teardown(wg)
+			wg.Wait()
+
+			// Now that we are done lets clean
+			runCtx.Info.RmDataDir()
+		}
 	}
 }
 
@@ -318,15 +349,24 @@ func Exec(args []string) {
  * This function going to cleanup everything for this command on exit.
  */
 func Cleanup() {
+	if cleaning {
+		return
+	}
+
+	cleaning = true
+
 	/**
 	 * If we have a running act let's kill it and all it's descendant
 	 * children (as part of killing the process group as a whole).
 	 */
-	if runCtx != nil {
-		fmt.Println("")
+	if runCtx != nil && runCtx.ActCtx != nil {
+		runCtx.IsCleaning = true
+
+		// If act has teardown commands let's run them before exit.
+		wg := &sync.WaitGroup{}
+		teardown(wg)
+		wg.Wait()
+
 		runCtx.Info.Kill()
 	}
-
-	// Exit main process
-	os.Exit(0)
 }

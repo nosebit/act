@@ -52,7 +52,7 @@ version: 1
 acts:
   foo:
     desc: This is a simple hello world act example
-    cmds:
+    start:
       - echo "Hello foo"
 ```
 
@@ -62,7 +62,7 @@ and then we run the act with the following command:
 act run foo
 ```
 
-or shortly we can do:
+or shortly we can do just:
 
 ```bash
 actr foo
@@ -74,7 +74,7 @@ If we need to specify a diferent actfile to be used we can do it like this:
 act run -f=/path/to/actfile.yml foo
 ```
 
-If we need to specify a more powerful command we can use shell scripting directly in `cmds` field like this:
+If we need to specify a more powerful command we can use shell scripting directly in `start` field like this:
 
 ```yaml
 # actfile.yml
@@ -83,7 +83,7 @@ version: 1
 acts:
   build-deps:
     desc: This act going to build dependencies in a workspace and optionally clean everything before start.
-    cmds: |
+    start: |
       echo "args=$@"
       yarn install --ignore-engines $@
 
@@ -103,7 +103,7 @@ version: 1
 acts:
   build-deps:
     desc: This act going to build dependencies in a workspace and optionally clean everything before start.
-    cmds:
+    start:
       - script: /path/to/script.sh
 
 ```
@@ -116,14 +116,14 @@ version: 1
 
 acts:
   foo:
-    cmds:
+    start:
       - cmd: echo "hello"
         shell: sh
       - script: /path/to/script.sh
         shell: bash # default
   bar:
     shell: bash # default
-    cmds:
+    start:
       - echo "bar 1"
       - echo "bar 2"
 ```
@@ -148,11 +148,11 @@ before-all:
 
 acts:
   foo:
-    cmds: echo "im foo"
+    start: echo "im foo"
   bar:
-    cmds: echo "im bar with args=$@"
+    start: echo "im bar with args=$@"
   zoo:
-    cmds: echo "im zoo with args=$@"
+    start: echo "im zoo with args=$@"
 ```
 
 
@@ -166,20 +166,21 @@ version: 1
 
 acts:
   foo:
-    parallel: true
-    cmds:
-      - |
-        echo "running cmd1"
+    start:
+      parallel: true
+      cmds:
+        - |
+          echo "running cmd1"
 
-        for i in {1..5}; do
-          echo "cmd1 $i"; sleep 2
-        done
-      - |
-        echo "running cmd2"
+          for i in {1..5}; do
+            echo "cmd1 $i"; sleep 2
+          done
+        - |
+          echo "running cmd2"
 
-        for i in {1..5}; do
-          echo "cmd2 $i"; sleep 2
-        done
+          for i in {1..5}; do
+            echo "cmd2 $i"; sleep 2
+          done
 ```
 
 
@@ -194,7 +195,7 @@ version: 1
 acts:
   foo-.+:
     desc: This is a generic foo act.
-    cmds:
+    start:
       - echo "i'm $ACT_NAME"
 ```
 
@@ -220,7 +221,7 @@ acts:
     desc: Act with subacts.
     acts:
       bar:
-        cmds:
+        start:
           - echo "im bar subact of foo"
 ```
 
@@ -240,9 +241,9 @@ acts:
     desc: Act with subacts and index subact.
     acts:
       _:
-        cmds: echo "im foo"
+        start: echo "im foo"
       bar:
-        cmds: echo "im bar subact of foo"
+        start: echo "im bar subact of foo"
 ```
 
 Now we can run `act run foo` to see `im foo` printde to the screen and `act run foo.bar` to see `im bar subact of foo`.
@@ -268,7 +269,7 @@ version: 1
 acts:
   foo:
     desc: This is a sample act.
-    cmds:
+    start:
       - echo "im bar"
 ```
 
@@ -297,16 +298,16 @@ and then in a subdirectory called `backend` for example we can have:
 version: 1
 
 acts:
-  start:
+  up:
     desc: Start backend service written in nodejs.
-    cmds:
+    start:
       - node index.js
 ```
 
 This way we can start the backend from the root project directory by running:
 
 ```bash
-act run backend.start
+act run backend.up
 ```
 
 ### Redirect Act Call To Another Actfile
@@ -330,7 +331,7 @@ version: 1
 
 acts:
   foo:
-    cmds: echo "im foo in another/actfile.yml"
+    start: echo "im foo in another/actfile.yml"
 ```
 
 This way when we call `act run foo` in the folder containing `actfile.yml` we going to see `im foo in another/actfile.yml` printed to the screen. When used with regex name matching feature of Act this can be very powerful because we can redirect a group of call to another actfile. Suppose we have the following folder structure:
@@ -351,10 +352,10 @@ with following actfile for backend:
 version: 1
 
 acts:
-  start:
-    cmds: node index.js
+  up:
+    start: node index.js
   build:
-    cmds: echo "lets transpile ts to js"
+    start: echo "lets transpile ts to js"
 ```
 
 We can redirect all act calls to reach backend acts by default like this:
@@ -382,12 +383,12 @@ version: 1
 acts:
   foo:
     desc: This is an act that include subacts.
-    cmds:
+    start:
       - echo "foo before bar"
       - act: bar
       - echo "foo after bar"
   bar:
-    cmds:
+    start:
       - echo "im bar"
 ```
 
@@ -420,7 +421,7 @@ version: 1
 
 acts:
   foo:
-    cmds:
+    start:
       - grep -q MY_VAR $ACT_ENV || printf "MY_VAR=Bruno\n" >> $ACT_ENV
       - echo "MY_VAR is $MY_VAR"
 ```
@@ -452,7 +453,7 @@ envfile: .vars
 
 acts:
   foo:
-    cmds:
+    start:
       - echo "my rendered var is {{.MY_VAR}}"
       - echo "my env var is $MY_VAR"
 ```
@@ -480,7 +481,7 @@ envfile: .var
 
 acts:
   foo:
-    cmds:
+    start:
       - grep -q MY_VAR $ACT_ENV_FILE || printf "MY_VAR=Bruno\n" >> $ACT_ENV_FILE
       - echo "MY_VAR is $MY_VAR"
 ```
@@ -506,7 +507,7 @@ acts:
     flags:
       - daemon:false
       - name
-    cmds:
+    start:
       - echo "daemon boolean flag => $FLAG_DAEMON"
       - echo "name string flag => $FLAG_NAME"
       - echo "other args are => $@"
@@ -525,7 +526,7 @@ version: 1
 
 acts:
   foo:
-    cmds:
+    start:
       - cmd: echo {{.LoopItem}}
         loop:
           items:
@@ -542,7 +543,7 @@ version: 1
 
 acts:
   setup:
-    cmds:
+    start:
       - act: setup
         from: "{{.LoopItem}}"
         loop:
@@ -564,7 +565,7 @@ version: 1
 acts:
   foo:
     log: prefixed
-    cmds:
+    start:
       - echo "im prefixed"
 ```
 
@@ -586,7 +587,7 @@ version: 1
 acts:
   foo:
     desc: This is a simple long running act example
-    cmds:
+    start:
       - while true; echo "Hello long running"; sleep 5; done
 ```
 
@@ -634,19 +635,36 @@ version: 1
 
 acts:
   long1:
-    cmds: while true; do echo "hello long1"; sleep 4; done
+    start: while true; do echo "hello long1"; sleep 4; done
   long2:
-    cmds: while true; do echo "hello long2"; sleep 2; done
+    start: while true; do echo "hello long2"; sleep 2; done
 
   all:
-    parallel: true
     log: prefixed
-    cmds:
-      - act: long1
-        detach: true
+    start:
+      parallel: true
+      cmds:
+        - act: long1
+          detach: true
 
-      - act: long2
-        detach: true
+        - act: long2
+          detach: true
 ```
 
 This way if we run `act run all` we going to run long1 and long2 as different act processes and we can stop only one of those with `act stop all::long1` for example. If we want to kill everything we can do `act stop all`.
+
+### Teardown
+
+If we need to run commands at the very end of the act execution we can use teardown commands like the following:
+
+```yaml
+# actfile.yml
+version: 1
+
+acts:
+  foo:
+    start: echo "started"
+    teardown: echo "cleaning up"
+```
+
+Remember that teardown commands run if start command finish successfully or if it fails as well.

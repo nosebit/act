@@ -50,10 +50,9 @@ type ActRunCtx struct {
 	CallId string
 
 	/**
-	 * This flag indicates if commands should be executed
-	 * in parallel or not.
+	 * Indicates which stage is currently running.
 	 */
-	ParallelExec bool
+	CurrentStage *actfile.ActExecStage
 
 	/**
 	 * List of cli flag values passed by the user.
@@ -246,10 +245,14 @@ func (ctx *ActRunCtx) ExecBeforeAll() {
 
 			beforeCallId := fmt.Sprintf("%s::before", currCtx.CallId)
 
+			beforeAllAct := &actfile.Act{
+				Start: beforeAll,
+			}
+
 			beforeAllCtx := ActRunCtx{
 				CallId:  beforeCallId,
 				ActFile: currCtx.ActFile,
-				Act:     beforeAll,
+				Act:     beforeAllAct,
 				RunCtx:  runCtx,
 				Vars:    runCtx.Vars,
 			}
@@ -347,15 +350,20 @@ func (ctx *ActRunCtx) Exec() {
 		ctx.Args = flagSet.Args()
 	}
 
+	// If Act does not have an act stage lets return (do nothing)
+	if ctx.Act.Start == nil {
+		return
+	}
+
 	// Go over each command and execute them in sequence or in parallel.
 	wg := sync.WaitGroup{}
 
-	if ctx.Act.Parallel {
-		wg.Add(len(ctx.Act.Cmds))
+	if ctx.Act.Start.Parallel {
+		wg.Add(len(ctx.Act.Start.Cmds))
 	}
 
-	// Execute all act commands
-	CmdsExec(ctx.Act.Cmds, ctx, &wg)
+	// Execute all act start commands
+	StageCmdsExec(ctx.Act.Start, ctx, &wg)
 
 	/**
 	 * Wait all commands to finish because acts going to run

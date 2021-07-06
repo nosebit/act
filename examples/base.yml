@@ -15,8 +15,12 @@ before-all:
     - echo "MANO=cole" >> $ACT_ENV
 
 acts:
+  hello:
+    start: echo "hello start"
+    teardown: echo "clear now"
+
   act0:
-    cmds:
+    start:
       - echo "hello act0"
       - echo "Rendered {{.MY_ENV_VAR}}"
       - grep -q MY_NAME $ACT_ENV_FILE || printf "MY_NAME=Shirley\n" >> $ACT_ENV_FILE
@@ -27,7 +31,7 @@ acts:
     flags:
       - check:false
       - name
-    cmds:
+    start:
       - echo "root act 1"
       - echo "check=$FLAG_CHECK"
       - echo "name is $FLAG_NAME"

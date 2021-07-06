@@ -113,4 +113,7 @@ func main() {
 
 	// Wait cleanup to finish
 	cleanup.Wait()
+
+	// Now exit with correct exit code
+	os.Exit(utils.ExitCode)
 }

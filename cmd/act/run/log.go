@@ -124,7 +124,13 @@ func (l *LogWriter) out(str string) (err error) {
 	 */
 	fmt.Print(strToLog)
 
-	if l.Detached {
+	/**
+	 * If this act is a child act then lets log to its own file
+	 * as well. The stdout log before going to be catched by
+	 * parent act while log to file ensure we can see logs for
+	 * this child act in isolation.
+	 */
+	if l.ctx.RunCtx.Info.ParentActId != "" {
 		l.logFile.Write([]byte(strToLog))
 	}
 

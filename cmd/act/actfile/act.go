@@ -5,7 +5,9 @@
 
 package actfile
 
-import "gopkg.in/yaml.v3"
+import (
+	"gopkg.in/yaml.v3"
+)
 
 //############################################################
 // Types
@@ -17,6 +19,58 @@ import "gopkg.in/yaml.v3"
  * specification.
  */
 type ActsMap map[string]*Act
+
+/**
+ * Act exec stage.
+ */
+type ActExecStage struct {
+	/**
+	 * Act stage name.
+	 */
+	Name string
+
+	/**
+	 * Flag indicating if commands in this stage should be
+	 * run in parallel.
+	 */
+	Parallel bool
+
+	/**
+	 * Commands to be executed in this exec stage.
+	 */
+	Cmds []*Cmd
+
+	/**
+	 * Path to a script to run instead of commands.
+	 */
+	Script string
+
+	/**
+	 * Set the shell to be used when running commands. By default
+	 * we use bash shell.
+	 */
+	Shell string
+
+	/**
+	 * Prevent logging.
+	 */
+	Quiet bool
+}
+
+/**
+ * Act check.
+ */
+type ActCheck struct {
+	/**
+	 * Commands to run in order to check if act is in success state.
+	 */
+	Cmds []*Cmd
+
+	/**
+	 * Interval to run checks.
+	 */
+	Interval int
+}
 
 /**
  * This is the struct we going to get fulfilled with data
@@ -81,28 +135,71 @@ type Act struct {
 	Flags []string
 
 	/**
-	 * The first way we can specify what this act going to do
-	 * is proving a list of shell commands that going to be
-	 * executed in sequence like the following:
+	 * Info about how to check if act is in success state
+	 * (useful for long running acts).
+	 */
+	Check *ActCheck
+
+	/**
+	 * Definition for act start exec stage. This is the main
+	 * exec stage and is the only required one. User can define
+	 * this stage in the following ways in actfile:
 	 *
 	 * ```yaml
+	 * # Using cmds (deprecated)
 	 * acts:
 	 *   foo:
+	 *     parallel: true
 	 *     cmds:
 	 *       - echo "im foo"
 	 *       - sleep 2
 	 *       - echo "im foo again"
 	 * ```
+	 *
+	 * ```yaml
+	 * # Using start (sequentially)
+	 * acts:
+	 *   foo:
+	 *     start:
+	 *       - echo "im foo"
+	 *       - sleep 2
+	 *       - echo "im foo again"
+	 * ```
+	 *
+	 * ```yaml
+	 * # Using start (parallel)
+	 * acts:
+	 *   foo:
+	 *     start:
+	 *       parallel: true
+	 *       cmds:
+	 *         - echo "im foo"
+	 *         - sleep 2
+	 *         - echo "im foo again"
+	 * ```
+	 *
+	 * ```yaml
+	 * # Using start (simple command)
+	 * acts:
+	 *   foo:
+	 *     start: echo "hello"
+	 * ```
 	 */
-	Cmds []*Cmd
+	Start *ActExecStage
 
 	/**
-	 * Another way we can specify the executable part of an act
-	 * is providing a path to a shell script file that going to
-	 * be invoked when user calls the act. If user specify both
-	 * cmds and script then script going to be used.
+	 * Definition for act post exec stage. Commands in
+	 * this stage going to be executed when the act is
+	 * in success state (via check commands).
 	 */
-	Script string
+	Post *ActExecStage
+
+	/**
+	 * Definition for act teardown exec stage. Commands
+	 * in this stage going to be executed just before
+	 * exiting the main program (due to success or error).
+	 */
+	Teardown *ActExecStage
 
 	/**
 	 * If we want to reuse an action with same name located in
@@ -190,11 +287,6 @@ type Act struct {
 	Log string
 
 	/**
-	 * Run act commands in parallel.
-	 */
-	Parallel bool
-
-	/**
 	 * Set the shell to be used when running commands. By default
 	 * we use bash shell.
 	 */
@@ -209,7 +301,7 @@ type Act struct {
  * the acts map and convert it to an array of acts so we can
  * keep the same key order of the defined map by user.
  */
-func ConvertActsObjectToList(actsNode yaml.Node) []*Act {
+func DecodeActs(actsNode yaml.Node) []*Act {
 	var acts []*Act
 
 	for i := 0; i < len(actsNode.Content); i += 2 {
@@ -225,6 +317,88 @@ func ConvertActsObjectToList(actsNode yaml.Node) []*Act {
 	}
 
 	return acts
+}
+
+/**
+ * This function going to decode generic cmds.
+ */
+func DecodeCmds(cmdsNode yaml.Node) []*Cmd {
+	/**
+	 * Try to decode from string first, then directly
+	 * from array.
+	 */
+	var cmds []*Cmd
+	var cmdStr string
+
+	if err := cmdsNode.Decode(&cmdStr); err == nil {
+		// For some reason if we don't have cmdNode its decoding to string.
+		if cmdStr == "" {
+			return nil
+		}
+
+		cmd := &Cmd{Cmd: cmdStr}
+		cmds = append(cmds, cmd)
+		return cmds
+	} else if err := cmdsNode.Decode(&cmds); err == nil {
+		return cmds
+	}
+
+	return nil
+}
+
+/**
+ * This function going to convert generic exec stages.
+ */
+func DecodeExecStage(stageNode yaml.Node, name string) *ActExecStage {
+	var stageObj struct {
+		Name     string
+		Parallel bool
+		Cmds     yaml.Node
+		Script   string
+		Shell    string
+		Quiet    bool
+	}
+
+	/**
+	 * Try to decode stage as string first, then as an array,
+	 * and then as an map.
+	 */
+	var stageStr string
+	var stageArr []*Cmd
+
+	if err := stageNode.Decode(&stageStr); err == nil {
+		// For some reason if we don't have stageNode its decoding to string.
+		if stageStr == "" {
+			return nil
+		}
+
+		cmd := &Cmd{Cmd: stageStr}
+
+		return &ActExecStage{
+			Name: name,
+			Cmds: []*Cmd{cmd},
+		}
+	} else if err := stageNode.Decode(&stageArr); err == nil {
+		return &ActExecStage{
+			Name: name,
+			Cmds: stageArr,
+		}
+	} else if err := stageNode.Decode(&stageObj); err == nil {
+		cmds := DecodeCmds(stageObj.Cmds)
+
+		if cmds != nil {
+			return &ActExecStage{
+				Name:     name,
+				Parallel: stageObj.Parallel,
+				Cmds:     cmds,
+				Script:   stageObj.Script,
+				Shell:    stageObj.Shell,
+				Quiet:    stageObj.Quiet,
+			}
+		}
+	}
+
+	return nil
 }
 
 //############################################################
@@ -246,7 +420,7 @@ func ConvertActsObjectToList(actsNode yaml.Node) []*Act {
 func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 	var actObj struct {
 		Desc     string
-		Cmds     []*Cmd
+		Cmds     yaml.Node
 		Flags    []string
 		Script   string
 		Redirect string
@@ -256,65 +430,38 @@ func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 		Parallel bool
 		Log      string
 		Shell    string
+		Start    yaml.Node
+		Post     yaml.Node
+		Teardown yaml.Node
 	}
 
 	if err := value.Decode(&actObj); err == nil {
 		act.Desc = actObj.Desc
-		act.Cmds = actObj.Cmds
 		act.Flags = actObj.Flags
-		act.Script = actObj.Script
 		act.Redirect = actObj.Redirect
 		act.Include = actObj.Include
 		act.Quiet = actObj.Quiet
-		act.Parallel = actObj.Parallel
 		act.Log = actObj.Log
 		act.Shell = actObj.Shell
 
-		/**
-		 * Now lets convert acts from map (yaml) to
-		 * array (struct) so we can keep acts order.
-		 */
-		act.Acts = ConvertActsObjectToList(actObj.Acts)
-	}
+		// Lets decode fields
+		act.Acts = DecodeActs(actObj.Acts)
 
-	/**
-	 * We can encode act cmds as a simple string of content.
-	 */
-	var actObj2 struct {
-		Desc     string
-		Cmds     string
-		Flags    []string
-		Script   string
-		Redirect string
-		Acts     yaml.Node
-		Include  string
-		Quiet    bool
-		Parallel bool
-		Log      string
-		Shell    string
-	}
+		// Decode start stage
+		act.Start = DecodeExecStage(actObj.Start, "start")
+		cmds := DecodeCmds(actObj.Cmds)
 
-	if err := value.Decode(&actObj2); err == nil {
-		cmd := Cmd{
-			Cmd: actObj2.Cmds,
+		if act.Start == nil && cmds != nil {
+			act.Start = &ActExecStage{
+				Name:     "start",
+				Cmds:     cmds,
+				Parallel: actObj.Parallel,
+				Script:   actObj.Script,
+			}
 		}
 
-		act.Desc = actObj2.Desc
-		act.Cmds = []*Cmd{&cmd}
-		act.Flags = actObj2.Flags
-		act.Script = actObj2.Script
-		act.Redirect = actObj2.Redirect
-		act.Include = actObj2.Include
-		act.Quiet = actObj2.Quiet
-		act.Parallel = actObj2.Parallel
-		act.Log = actObj2.Log
-		act.Shell = actObj2.Shell
-
-		/**
-		 * Now lets convert acts from map (yaml) to
-		 * array (struct) so we can keep acts order.
-		 */
-		act.Acts = ConvertActsObjectToList(actObj2.Acts)
+		act.Post = DecodeExecStage(actObj.Post, "post")
+		act.Teardown = DecodeExecStage(actObj.Teardown, "teardown")
 	}
 
 	return nil

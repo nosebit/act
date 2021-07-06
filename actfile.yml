@@ -27,6 +27,7 @@ acts:
   install:
     cmds:
       - go install ./...
+      - echo act installed
 
   ex:
     acts:

@@ -85,7 +85,7 @@ func actDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	shCmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
 	// Set logging
-	if !ctx.RunCtx.Quiet && !ctx.Act.Quiet && !cmd.Quiet {
+	if !ctx.RunCtx.Quiet && !ctx.Act.Quiet && !ctx.CurrentStage.Quiet && !cmd.Quiet {
 		l := NewLogWriter(ctx)
 
 		/**
@@ -120,18 +120,19 @@ func actDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 //############################################################
 
 /**
- * This function execute multiple commands withing a specific
- * act run context.
+ * This function going to execute a stage.
  */
-func CmdsExec(cmds []*actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
-	for _, cmd := range cmds {
-		if ctx.Act.Parallel {
+func StageCmdsExec(stage *actfile.ActExecStage, ctx *ActRunCtx, wg *sync.WaitGroup) {
+	ctx.CurrentStage = stage
+
+	for _, cmd := range stage.Cmds {
+		if stage.Parallel && wg != nil {
 			go CmdExec(cmd, ctx, wg)
 		} else {
 			CmdExec(cmd, ctx, nil)
 		}
 
-		if ctx.RunCtx.IsKilling {
+		if !ctx.RunCtx.IsCleaning && ctx.RunCtx.IsKilling {
 			break
 		}
 	}
@@ -191,7 +192,12 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 				cmds = append(cmds, &genCmd)
 			}
 
-			CmdsExec(cmds, ctx, wg)
+			stage := &actfile.ActExecStage{
+				Cmds:     cmds,
+				Parallel: ctx.CurrentStage.Parallel,
+			}
+
+			StageCmdsExec(stage, ctx, wg)
 		}
 
 		return
@@ -337,7 +343,7 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	/**
 	 * Set output
 	 */
-	if !ctx.RunCtx.Quiet && !ctx.Act.Quiet && !cmd.Quiet {
+	if !ctx.RunCtx.Quiet && !ctx.Act.Quiet && !ctx.CurrentStage.Quiet && !cmd.Quiet {
 
 		/**
 		 * Set the log mode. By default log mode is `raw` and therefore we going
@@ -408,14 +414,14 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 					 * running commands in parallel but we want to get
 					 * notified about command failure.
 					 */
-					if ctx.Act.Parallel {
+					if ctx.CurrentStage.Parallel {
 						utils.LogError(errMsg, err)
 					} else {
 						utils.FatalErrorWithCode(status.ExitStatus(), errMsg, err)
 					}
 				}
 			} else {
-				if ctx.Act.Parallel {
+				if ctx.CurrentStage.Parallel {
 					utils.LogError(errMsg, err)
 				} else {
 					utils.FatalError(errMsg, err)
@@ -425,7 +431,7 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	}
 
 	// Remove pgid now
-	if !ctx.RunCtx.IsKilling {
+	if !ctx.RunCtx.IsCleaning && !ctx.RunCtx.IsKilling {
 		ctx.RunCtx.Info.RmCmdPgid(pgid)
 	}
 
