@@ -55,6 +55,11 @@ type ActExecStage struct {
 	 * Prevent logging.
 	 */
 	Quiet bool
+
+	/**
+	 * Flag indicating if this stage is killed.
+	 */
+	IsKilled bool
 }
 
 /**
@@ -141,6 +146,12 @@ type Act struct {
 	Check *ActCheck
 
 	/**
+	 * Location of a file containing env vars we should load when
+	 * running this act.
+	 */
+	EnvFilePath string
+
+	/**
 	 * Definition for act start exec stage. This is the main
 	 * exec stage and is the only required one. User can define
 	 * this stage in the following ways in actfile:
@@ -188,18 +199,34 @@ type Act struct {
 	Start *ActExecStage
 
 	/**
-	 * Definition for act post exec stage. Commands in
+	 * Definition for act before exec stage. Commands in
+	 * this stage going to be executed just before executing
+	 * the start stage.
+	 */
+	Before *ActExecStage
+
+	/**
+	 * Definition for act after exec stage. Commands in
 	 * this stage going to be executed when the act is
 	 * in success state (via check commands).
 	 */
-	Post *ActExecStage
+	After *ActExecStage
 
 	/**
+	 * @deprecated - use Final stage instead
+	 *
 	 * Definition for act teardown exec stage. Commands
 	 * in this stage going to be executed just before
 	 * exiting the main program (due to success or error).
 	 */
 	Teardown *ActExecStage
+
+	/**
+	 * This stage going to be executed just before exiting the
+	 * executing. This is always going to be called no matter
+	 * the main act succedded or failed.
+	 */
+	Final *ActExecStage
 
 	/**
 	 * If we want to reuse an action with same name located in
@@ -419,25 +446,29 @@ func DecodeExecStage(stageNode yaml.Node, name string) *ActExecStage {
  */
 func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 	var actObj struct {
-		Desc     string
-		Cmds     yaml.Node
-		Flags    []string
-		Script   string
-		Redirect string
-		Acts     yaml.Node
-		Include  string
-		Quiet    bool
-		Parallel bool
-		Log      string
-		Shell    string
-		Start    yaml.Node
-		Post     yaml.Node
-		Teardown yaml.Node
+		Desc   				string
+		Cmds    			yaml.Node
+		Flags    			[]string
+		Script   			string
+		Redirect 			string
+		Acts     			yaml.Node
+		Include  			string
+		Quiet    			bool
+		Parallel 			bool
+		Log      			string
+		Shell    			string
+		EnvFilePath 	string `yaml:"envfile"`
+		Before   			yaml.Node
+		Start    			yaml.Node
+		After    			yaml.Node
+		Final 				yaml.Node
+		Teardown 			yaml.Node
 	}
 
 	if err := value.Decode(&actObj); err == nil {
 		act.Desc = actObj.Desc
 		act.Flags = actObj.Flags
+		act.EnvFilePath = actObj.EnvFilePath
 		act.Redirect = actObj.Redirect
 		act.Include = actObj.Include
 		act.Quiet = actObj.Quiet
@@ -460,8 +491,12 @@ func (act *Act) UnmarshalYAML(value *yaml.Node) error {
 			}
 		}
 
-		act.Post = DecodeExecStage(actObj.Post, "post")
-		act.Teardown = DecodeExecStage(actObj.Teardown, "teardown")
+		act.Before = DecodeExecStage(actObj.Before, "before")
+		act.After = DecodeExecStage(actObj.After, "after")
+		act.Final = DecodeExecStage(actObj.Final, "final")
+
+		// @deprecated
+		act.Teardown = DecodeExecStage(actObj.Teardown, "final")
 	}
 
 	return nil
