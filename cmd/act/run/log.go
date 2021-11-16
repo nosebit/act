@@ -29,11 +29,12 @@ import (
  * to be used as stdout/stderr for commands.
  */
 type LogWriter struct {
-	Detached  bool
-	ctx       *ActRunCtx
-	buf       *bytes.Buffer
-	readLines string
-	logFile   *os.File
+	Detached 			bool
+	LogToConsole 	bool
+	ctx       		*ActRunCtx
+	buf       		*bytes.Buffer
+	readLines 		string
+	logFile   		*os.File
 }
 
 /**
@@ -122,7 +123,9 @@ func (l *LogWriter) out(str string) (err error) {
 	/**
 	 * Log both to stdout and to file.
 	 */
-	fmt.Print(strToLog)
+	if l.LogToConsole {
+		fmt.Print(strToLog)
+	}
 
 	/**
 	 * If this act is a child act then lets log to its own file

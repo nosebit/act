@@ -131,7 +131,7 @@ func LogCmdExec(args []string) {
 /**
  * This function going to cleanup everything for this command on exit.
  */
-func LogCleanup() {
+func LogFinish() {
 	if ta != nil {
 		ta.Cleanup()
 		ta.Stop()

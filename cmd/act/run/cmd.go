@@ -61,6 +61,8 @@ func actDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 
 	childId, _ := shortid.Generate()
 
+	utils.LogDebug("actDetachExec", childId)
+
 	// Set environment vars
 	vars := ctx.MergeVars()
 
@@ -81,34 +83,39 @@ func actDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	shCmd.Dir = utils.GetWd()
 	shCmd.Env = envars
 
+	utils.LogDebug("actDetachExec : envars", envars)
+
 	// Ensure we create a new session for the created process (this mean a new pgid).
 	shCmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
-	// Set logging
-	if !ctx.RunCtx.Quiet && !ctx.Act.Quiet && !ctx.CurrentStage.Quiet && !cmd.Quiet {
-		l := NewLogWriter(ctx)
+	/**
+	 * Detached acts going to log only to file. If user want to see logs
+	 * he/she need to use the log command.
+	 */
+	//logFilePath := ctx.RunCtx.Info.GetLogFilePath()
+	//logFile, _ := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	//shCmd.Stdout = logFile
+	//shCmd.Stderr = logFile
 
-		/**
-		 * For detached processes we going to pevent logging prefix
-		 * info on this parent process so we don't end up having
-		 * double prefix infos. The prefixing going to be done
-		 * in the child process itself and here we just log whatever
-		 * child process send to us (prefixed).
-		 */
-		l.Detached = true
+	l := NewLogWriter(ctx)
+	l.Detached = true
+	l.LogToConsole = cmd.Log
 
-		shCmd.Stdout = l
-		shCmd.Stderr = l
-	}
+	shCmd.Stdout = l
+	shCmd.Stderr = l
 
 	// Start act execution
 	shCmd.Start()
+	
+	pid := shCmd.Process.Pid
+	pgid, _ := syscall.Getpgid(pid)
+
+	utils.LogDebug("actDetachExec : child act started", pid, pgid)
 
 	// Add child id
 	ctx.RunCtx.Info.AddChildActId(childId)
 
-	// Wait child process finalization.
-	shCmd.Wait()
+	utils.LogDebug("actDetachExec : done")
 
 	if wg != nil {
 		wg.Done()
@@ -122,29 +129,65 @@ func actDetachExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 /**
  * This function going to execute a stage.
  */
-func StageCmdsExec(stage *actfile.ActExecStage, ctx *ActRunCtx, wg *sync.WaitGroup) {
+func StageCmdsExec(stage *actfile.ActExecStage, ctx *ActRunCtx) {
+	utils.LogDebug("StageCmdsExec", stage.Name, ctx.RunCtx.State)
+
+	/**
+	 * Prevent execution if we are not in the running state. This is
+	 * important so we don't execute stages when we get killed by
+	 * client (which is going to put the execution in the stopped state).
+	 */
+	if ctx.RunCtx.State != ExecStateRunning {
+		return
+	}
+
 	ctx.CurrentStage = stage
 
-	for _, cmd := range stage.Cmds {
-		if stage.Parallel && wg != nil {
-			go CmdExec(cmd, ctx, wg)
-		} else {
-			CmdExec(cmd, ctx, nil)
+	utils.LogDebug(fmt.Sprintf("StageCmdsExec : start execution [act=%s] [stage=%s] [cmds_count=%d]", ctx.Act.Name, stage.Name, len(stage.Cmds)))
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(stage.Cmds))
+
+	for idx, cmd := range stage.Cmds {
+		/**
+		 * Prevent keep executing this stage if we are not in the running state. This is
+	   * important so we don't execute more commands when we get killed by
+	   * client (which is going to put the execution in the stopped state).
+		 */
+		if ctx.RunCtx.State != ExecStateRunning {
+			wg.Done()
+			continue
 		}
 
-		if !ctx.RunCtx.IsCleaning && ctx.RunCtx.IsKilling {
-			break
+		utils.LogDebug(fmt.Sprintf("StageCmdsExec : cmd execution [act=%s] [stage=%s] [progress=%d/%d]", ctx.Act.Name, stage.Name, idx+1, len(stage.Cmds)))
+
+		if stage.Parallel{
+			go CmdExec(cmd, ctx, &wg)
+		} else {
+			CmdExec(cmd, ctx, &wg)
 		}
+
+		utils.LogDebug(fmt.Sprintf("StageCmdsExec : cmd execution done [act=%s] [stage=%s] [progress=%d/%d]", ctx.Act.Name, stage.Name, idx+1, len(stage.Cmds)))
 	}
+
+	// Wait execution of all commands.
+	wg.Wait()
 }
 
 /**
  * This function going to execute a command.
  */
 func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
-	if ctx.RunCtx.IsKilling {
+	/**
+	 * Prevent execution if we are not in the running state. This is
+	 * important so we don't execute stages when we get killed by
+	 * client (which is going to put the execution in the stopped state).
+	 */
+	if ctx.RunCtx.State != ExecStateRunning {
 		return
 	}
+
+	utils.LogDebug(fmt.Sprintf("CmdExec : begin [act=%s]", ctx.Act.Name))
 
 	/**
 	 * Merge all local vars together respecting overide rules.
@@ -159,8 +202,9 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		var items []string
 
 		if cmd.Loop.Glob != "" {
+			baseDir := path.Dir(ctx.ActFile.LocationPath)
 			glob := utils.CompileTemplate(cmd.Loop.Glob, vars)
-			pattern := utils.ResolvePath(utils.GetWd(), glob)
+			pattern := utils.ResolvePath(baseDir, glob)
 			paths, err := filepath.Glob(pattern)
 
 			if err != nil {
@@ -197,7 +241,15 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 				Parallel: ctx.CurrentStage.Parallel,
 			}
 
-			StageCmdsExec(stage, ctx, wg)
+			StageCmdsExec(stage, ctx)
+		}
+
+		/**
+		 * Now that we finished running the command we need to
+		 * release the wait group (i.e., mark it as done).
+		 */
+		if wg != nil {
+			wg.Done()
 		}
 
 		return
@@ -207,6 +259,7 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	 * If command is invoking another act then lets run it.
 	 */
 	if cmd.Act != "" {
+		utils.LogDebug(fmt.Sprintf("CmdExec : sub act found [act=%s]", ctx.Act.Name))
 
 		/**
 		 * If we want to run the act as separate act process
@@ -220,6 +273,7 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		actField := utils.CompileTemplate(cmd.Act, vars)
 		actNames := strings.Split(actField, ActCallIdSeparator)
 		actFile := ctx.ActFile
+		var cmdArgs []string
 
 		// Set actfile to look up for act.
 		if cmd.From != "" {
@@ -229,6 +283,11 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 			if actFile.LocationPath != actFilePath {
 				actFile = actfile.ReadActFile(actFilePath)
 			}
+		}
+
+		for _, arg := range cmd.Args {
+			compiledArg := utils.CompileTemplate(arg, vars)
+			cmdArgs = append(cmdArgs, compiledArg)
 		}
 
 		nextCtx, err := FindActCtx(actNames, actFile, ctx, ctx.RunCtx)
@@ -247,10 +306,21 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 			utils.FatalError(err)
 		}
 
-		nextCtx.Args = cmd.Args
+		nextCtx.Args = cmdArgs
 		nextCtx.Act.Log = ctx.Act.Log
 
+		utils.LogDebug(fmt.Sprintf("CmdExec : sub act : start execution [act=%s]", ctx.Act.Name, nextCtx.Args))
 		nextCtx.Exec()
+		utils.LogDebug(fmt.Sprintf("CmdExec : sub act : end [act=%s]", ctx.Act.Name))
+
+		/**
+		 * Now that we finished running the command we need to
+		 * release the wait group (i.e., mark it as done).
+		 */
+		if wg != nil {
+			wg.Done()
+		}
+
 		return
 	}
 
@@ -285,6 +355,8 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	if cmd.Shell != "" {
 		shell = cmd.Shell
 	}
+
+	utils.LogDebug(fmt.Sprintf("CmdExec : starting execution [act=%s]", ctx.Act.Name), shArgs)
 
 	// Command to spawn.
 	shCmd := exec.Command(shell, shArgs...)
@@ -392,8 +464,14 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	// Save to run context info file
 	ctx.RunCtx.Info.AddCmdPgid(pgid)
 
-	// Wait finalization and get error code
-	if err := shCmd.Wait(); err != nil {
+	/**
+	 * Wait command finalization and get any error code thrown.
+	 *
+	 * @note: When we kill the main process we going to run KillChildren
+	 * function to kill all children. In this case shCmd.Wait going
+	 * to rise an error because the command got killed.
+	 */
+	if err := shCmd.Wait(); err != nil && !ctx.RunCtx.IsFinishing {
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			errMsg := fmt.Sprintf("command '%s' failed", cmdLine)
 
@@ -430,12 +508,18 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 		}
 	}
 
-	// Remove pgid now
-	if !ctx.RunCtx.IsCleaning && !ctx.RunCtx.IsKilling {
-		ctx.RunCtx.Info.RmCmdPgid(pgid)
-	}
+	utils.LogDebug(fmt.Sprintf("CmdExec : wait done [act=%s]", ctx.Act.Name), shArgs)
 
+	/**
+	 * Now that the command finished let's remove its pgid.
+	 */
+	ctx.RunCtx.Info.RmCmdPgid(pgid)
+
+	/**
+	 * Now that we finished running the command we need to
+	 * release the wait group (i.e., mark it as done).
+	 */
 	if wg != nil {
-		wg.Done()
+	 wg.Done()
 	}
 }

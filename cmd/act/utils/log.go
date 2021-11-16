@@ -85,7 +85,11 @@ func LogInfo(args ...interface{}) {
  * This function going to handle fatal error.
  */
 func FatalError(args ...interface{}) {
-	LogError(args...)
+
+	if len(args) > 0 {
+		LogError(args...)
+	}
+
 	ExitCode = 1
 	exitGracefully()
 }

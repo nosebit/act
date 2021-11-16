@@ -5,9 +5,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
 	/**
@@ -28,11 +28,14 @@ import (
  */
 
 //############################################################
+// Internal Variables
+//############################################################
+var killed bool
+
+//############################################################
 // Internal Functions
 //############################################################
-func scheduleQuitCleanup() *sync.WaitGroup {
-	var wg sync.WaitGroup
-
+func scheduleStopOnKill() {
 	/**
 	 * Upon exit we going to clean up state.
 	 */
@@ -41,9 +44,8 @@ func scheduleQuitCleanup() *sync.WaitGroup {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	/**
-	 * Run our cleanup function as a go routine (i.e., in parallel) so
-	 * we don't block the main execution since we need to wait for
-	 * a quit event to do the cleanup job.
+	 * When we receive a kill process we going to stop the current
+	 * execution.
 	 */
 	go func() {
 		/**
@@ -52,29 +54,33 @@ func scheduleQuitCleanup() *sync.WaitGroup {
 		 */
 		<-sigs
 
-		/**
-		 * Mark we are running a long running task that should be
-		 * waited from the caller.
-		 */
-		wg.Add(1)
+		utils.LogDebug("Received kill signal")
 
 		/**
-		 * Run cleanup functions for current executing command.
+		 * Skip one line to prevent showing `^C` in the terminal
+		 * next to logs for final commands like the following:
+		 *
+		 * ```text
+		 * hello long1
+		 * hello long2
+		 * hello long2
+		 * hello long1
+		 * hello long2
+		 * ^Ccleaning 1
+		 * cleaning 2
+		 * cleaning 3
+		 * cleaning 4
+		 * ```
 		 */
-		cmd.Cleanup()
+		fmt.Println()
+
+		killed = true
 
 		/**
-		 * Now we can safelly unblock the execution of the waiting
-		 * caller.
+		 * Stop execution.
 		 */
-		wg.Done()
+		cmd.Stop();
 	}()
-
-	/**
-	 * Returns the wait group so caller can wait (be blocked) until
-	 * our cleanup go routine is done.
-	 */
-	return &wg
 }
 
 //############################################################
@@ -89,12 +95,11 @@ func scheduleQuitCleanup() *sync.WaitGroup {
 func main() {
 
 	/**
-	 * We start by scheduling a cleanup job that going to be run
-	 * on process termination. This cleanup schedule returns a
-	 * wait group we going to wait at the end of this main function
-	 * to allow cleanup finish correctly (which can take some time).
+	 * We start by scheduling a stop job that going to be run
+	 * on process termination. This way when client sends a kill
+	 * signal we going to stop the main execution.
 	 */
-	cleanup := scheduleQuitCleanup()
+	scheduleStopOnKill()
 
 	//--------------------------------------------------
 	// Parse command line args
@@ -109,11 +114,25 @@ func main() {
 	}
 
 	// Now we execute subcommand (synchronously)
+	/**
+	 * Execute the subcomand. The execution of all commands
+	 * going to be synchronously and therefore going to block
+	 * this main thread while execution is running. When the
+	 * process receive a Kill signal it going first to stop
+	 * the main execution which going to make cmd.Exec to return
+	 * the control to this main flow here.
+	 */
 	cmd.Exec(args)
 
-	// Wait cleanup to finish
-	cleanup.Wait()
+	/**
+	 * Now that main execution is done (or stopped because of a kill)
+	 * we going to run the finish stage so we can gracefully exit.
+	 * In the finish stage we going to run any final commands the
+	 * cliend defined in the actfile to cleanup the execution before
+	 * exiting.
+	 */
+	cmd.Finish()
 
-	// Now exit with correct exit code
+	// Now exit with correct exit code.
 	os.Exit(utils.ExitCode)
 }
