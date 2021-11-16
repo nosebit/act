@@ -68,15 +68,25 @@ func Exec(args []string) {
 }
 
 /**
- * This function going to call the correct cleanup function
- * for the executing command.
+ * This function going to stop current execution.
  */
-func Cleanup() {
+func Stop() {
 	switch cmdName {
 	case "run":
-		run.Cleanup()
+		run.Stop()
+	default:
+	}
+}
+
+/**
+ * This function runs final actions before exiting.
+ */
+func Finish() {
+	switch cmdName {
+	case "run":
+		run.Finish()
 	case "log":
-		LogCleanup()
+		LogFinish()
 	default:
 	}
 }
