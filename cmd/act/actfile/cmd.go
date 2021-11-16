@@ -146,6 +146,11 @@ type Cmd struct {
 	 * Disable logging
 	 */
 	Quiet bool
+
+	/**
+	 * Enable or disable log.
+	 */
+	Log bool
 }
 
 //############################################################
@@ -199,6 +204,7 @@ func (cmd *Cmd) UnmarshalYAML(value *yaml.Node) error {
 		Detach 		bool
 		Args   		[]string
 		Quiet  		bool
+		Log  			bool
 		Loop   		*CmdLoop
 		Mismatch 	string
 	}
@@ -212,6 +218,7 @@ func (cmd *Cmd) UnmarshalYAML(value *yaml.Node) error {
 		cmd.Detach = cmdObj.Detach
 		cmd.Args = cmdObj.Args
 		cmd.Quiet = cmdObj.Quiet
+		cmd.Log = cmdObj.Log
 		cmd.Loop = cmdObj.Loop
 		cmd.Mismatch = cmdObj.Mismatch
 
