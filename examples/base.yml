@@ -1,6 +1,6 @@
 version: 1
 
-envfile: .env
+envfile: .vars
 
 before-all:
   quiet: true
@@ -16,26 +16,51 @@ before-all:
 
 acts:
   hello:
-    start: echo "hello start"
+    start:
+      - echo "hello start"
+      - echo "TEST_VAR_1=$TEST_VAR_1"
+      - echo "TEST_VAR_2=$TEST_VAR_2"
     teardown: echo "clear now"
 
   act0:
     start:
       - echo "hello act0"
       - echo "Rendered {{.MY_ENV_VAR}}"
+      - echo ACT_NAME=$ACT_NAME
       - grep -q MY_NAME $ACT_ENV_FILE || printf "MY_NAME=Shirley\n" >> $ACT_ENV_FILE
       - echo "MY_ENV_VAR=$MY_ENV_VAR"
       - echo "MY_NAME is $MY_NAME"
 
+  act11:
+    cmds:
+      - echo "MY_NAME=$MY_NAME"
+      - act: act12
+
+  act12:
+    flags:
+      - check:false
+    cmds:
+      - echo "act12"
+      - act: act1 -check={{.FlagCheck}}
+
   act1:
+    envfile: .vars2
     flags:
       - check:false
       - name
     start:
+      - echo "MY_NAME=$MY_NAME"
       - echo "root act 1"
       - echo "check=$FLAG_CHECK"
       - echo "name is $FLAG_NAME"
       - echo "other args are $@"
+      - act: act21
+        detach: true
+      - sleep 30
+
+  act21:
+    start:
+      - echo "MY_NAME=$MY_NAME" >> /Users/bruno/Empresas/nosebit/projects/haiki/workspace/@nosebit/act/.actdt/test.txt
 
   act2:
     redirect: child/actfile.yml
@@ -62,6 +87,14 @@ acts:
   vim:
     cmds:
       - vim
+
+  setup:
+    cmds:
+      - act: setup
+        from: "{{.LoopItem}}"
+        loop:
+          glob: "**/actfile.yml"
+        mismatch: allow
 
   child:
     include: child/actfile.yml

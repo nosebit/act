@@ -33,7 +33,14 @@ acts:
         for i in {1..5}; do
           echo "cmd2 $i $FLAG_NAME"; sleep 2
         done
-      
+
+  setup:
+    cmds:
+      - act: setup
+        from: "{{.LoopItem}}"
+        loop:
+          glob: "**/actfile.yml"
+        mismatch: allow
 
   grandchild:
     include: grandchild/actfile.yml

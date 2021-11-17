@@ -7,11 +7,58 @@ acts:
   long2:
     cmds: while true; do echo "hello long2"; sleep 2; done
 
+  test:
+    before:
+      - for i in {1..3}; do echo "test before $i"; sleep 2; done
+    start:
+      - for i in {1..3}; do echo "test running $i"; sleep 2; done
+    final:
+      - for i in {1..3}; do echo "test final $i"; sleep 2; done
+
+  test2:
+    before:
+      - for i in {1..3}; do echo "test2 before $i"; sleep 2; done
+    start:
+      - act: test
+      - for i in {1..3}; do echo "test2 running $i"; sleep 2; done
+    final:
+      - for i in {1..3}; do echo "test2 final $i"; sleep 2; done
+
+  detach-child-1:
+    before:
+      - echo "[detach-child-1] before" >> /Users/bruno/Empresas/nosebit/projects/haiki/workspace/@nosebit/act/.actdt/dlogs-hooks
+    start:
+      - while true; do echo "[detach-child-1] running" >> /Users/bruno/Empresas/nosebit/projects/haiki/workspace/@nosebit/act/.actdt/dlogs; sleep 4; done
+    final:
+      - echo "[detach-child-1] final" >> /Users/bruno/Empresas/nosebit/projects/haiki/workspace/@nosebit/act/.actdt/dlogs-hooks
+
+  detach-child-2:
+    before:
+      - echo "[detach-child-2] before" >> /Users/bruno/Empresas/nosebit/projects/haiki/workspace/@nosebit/act/.actdt/dlogs-hooks
+    start:
+      - while true; do echo "[detach-child-2] running" >> /Users/bruno/Empresas/nosebit/projects/haiki/workspace/@nosebit/act/.actdt/dlogs; sleep 2; done
+    final:
+      - echo "[detach-child-2] final" >> /Users/bruno/Empresas/nosebit/projects/haiki/workspace/@nosebit/act/.actdt/dlogs-hooks
+
+  detach:
+    before:
+      - for i in {1..3}; do echo "detach before $i"; sleep 2; done
+    start:
+      - act: detach-child-1
+        detach: true
+      - act: detach-child-2
+        detach: true
+      - for i in {1..10}; do echo "detach $i"; sleep 2; done
+    final:
+      - for i in {1..4}; do echo "detach final $i"; sleep 2; done
+
   all:
-    parallel: true
-    log: prefixed
-    cmds:
-      - act: long1
-        detach: true
-      - act: long2
-        detach: true
+    before:
+      - for i in {1..4}; do echo "all before $i"; sleep 2; done
+    start:
+      parallel: true
+      cmds:
+        - act: long1
+        - act: long2
+    final:
+      - for i in {1..4}; do echo "all final $i"; sleep 2; done

@@ -1,5 +1,7 @@
 version: 1
 
+envfile: .vars
+
 acts:
   git:
     acts:

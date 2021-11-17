@@ -19,7 +19,3 @@ acts:
       - |
         echo "somos assim"
         echo $@
-
-  setup:
-    start:
-      - echo "setting up grandchild"
