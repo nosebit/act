@@ -10,7 +10,7 @@ Act is a task runner and supervisor tool written in Go which aims to provide the
 * and much more :)
 
 
-## Instalation
+## Installation
 
 @TODO : We need to compile binaries and have a nice way to install act like we have for volta https://volta.sh/.
 
@@ -68,7 +68,7 @@ or shortly we can do just:
 actr foo
 ```
 
-If we need to specify a diferent actfile to be used we can do it like this:
+If we need to specify a different actfile to be used we can do it like this:
 
 ```bash
 act run -f=/path/to/actfile.yml foo
@@ -94,7 +94,7 @@ Notice that acts can receive command line arguments which are being used in `bui
 
 ### Running Scripts as Commands
 
-If we don't want to "polute" the actfile with a lot of scripting like we did for `build-deps` we can provide a script file using the `script` field of a command like this:
+If we don't want to "pollute" the actfile with a lot of scripting like we did for `build-deps` we can provide a script file using the `script` field of a command like this:
 
 ```yaml
 # actfile.yml
@@ -138,7 +138,7 @@ If we need to run commands before any act executed we can do it like this:
 version: 1
 
 before-all:
-  cmds:
+  start:
     - echo "running before"
     - act: bar inline-arg-1 inline-arg-2
     - act: zoo
@@ -230,7 +230,7 @@ which we can run like this:
 ```bash
 act run foo.bar
 ```
-A specicial index subact named `_` can be provided to match the parent act name like this:
+A special index subact named `_` can be provided to match the parent act name like this:
 
 ```yaml
 # actfile.yml
@@ -294,7 +294,7 @@ acts:
 and then in a subdirectory called `backend` for example we can have:
 
 ```yaml
-# backend/acfile.yml
+# backend/actfile.yml
 version: 1
 
 acts:
@@ -315,7 +315,7 @@ act run backend.up
 If we need to redirect the call to a `foo` act to an act with same name in another actfile we can use it like this:
 
 ```yaml
-# acfile.yml
+# actfile.yml
 version: 1
 
 acts:
@@ -337,10 +337,10 @@ acts:
 This way when we call `act run foo` in the folder containing `actfile.yml` we going to see `im foo in another/actfile.yml` printed to the screen. When used with regex name matching feature of Act this can be very powerful because we can redirect a group of call to another actfile. Suppose we have the following folder structure:
 
 ```txt
-my-worspace
+my-workspace
   |-- backend
   |   |-- actfile.yml
-  |-- frontned
+  |-- frontend
   |   |-- actfile.yml
   |-- actfile.yml
 ```
@@ -655,7 +655,7 @@ This way if we run `act run all` we going to run long1 and long2 as different ac
 
 ### Teardown
 
-If we need to run commands at the very end of the act execution we can use teardown commands like the following:
+If we need to run commands at the very end of the act execution we can use teardown (or final) commands like the following:
 
 ```yaml
 # actfile.yml
@@ -664,7 +664,7 @@ version: 1
 acts:
   foo:
     start: echo "started"
-    teardown: echo "cleaning up"
+    final: echo "cleaning up"
 ```
 
 Remember that teardown commands run if start command finish successfully or if it fails as well.
