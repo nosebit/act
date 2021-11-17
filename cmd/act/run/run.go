@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"sync"
 	"syscall"
 
 	"github.com/logrusorgru/aurora/v3"
@@ -18,6 +17,14 @@ import (
 //############################################################
 // Types
 //############################################################
+/**
+ * Execution state.
+ */
+const (
+	ExecStateStopped string = "stopped"
+	ExecStateRunning = "running"
+)
+
 /**
  * This run context going to hold all global info we need to run
  * an act.
@@ -59,25 +66,31 @@ type RunCtx struct {
 	ActVars map[string]string
 
 	/**
+	 * This stack going to hold all acts run contexts we have
+	 * active so far.
+	 */
+	ActCtxCallStack []*ActRunCtx
+
+	/**
 	 * Run context info as stored in act data dir.
 	 */
 	Info *Info
-
-	/**
-	 * Flag indicating we are killing the run process.
-	 */
-	IsKilling bool
-
-	/**
-	 * Flag indicating if we are running cleaning before exiting.
-	 */
-	IsCleaning bool
 
 	/**
 	 * Flag indicating if we are running the process as a
 	 * daemon in the background.
 	 */
 	IsDaemon bool
+
+	/**
+	 * Flag indicating the state of the execution.
+	 */
+	State string
+
+	/**
+	 * Flag indicating we are finishing the execution.
+	 */
+	IsFinishing bool
 
 	/**
 	 * Log mode.
@@ -104,7 +117,6 @@ func (ctx *RunCtx) Print() {
 //############################################################
 // Internal Variables
 //############################################################
-var cleaning bool
 var runCtx *RunCtx
 
 //############################################################
@@ -119,11 +131,11 @@ func createRunCtx(args []string, actFile *actfile.ActFile) *RunCtx {
 
 	// Create run context to be filled
 	ctx := &RunCtx{
-		ActFile:     actFile,
-		Vars:        make(map[string]string),
-		EnvFileVars: make(map[string]string),
-		ActVars:     make(map[string]string),
-		Args:        args[1:],
+		ActFile:     	actFile,
+		Vars:        	make(map[string]string),
+		EnvFileVars: 	make(map[string]string),
+		ActVars:     	make(map[string]string),
+		Args:        	args[1:],
 	}
 
 	// Create run info
@@ -202,16 +214,27 @@ func createRunCtx(args []string, actFile *actfile.ActFile) *RunCtx {
 	return ctx
 }
 
-/**
- * This function going to run teardown commands of currently
- * running act upon exit.
- *
- * @TODO: We need to run teardown cmds of all running acts.
- */
-func teardown(wg *sync.WaitGroup) {
-	if runCtx != nil && runCtx.ActCtx.Act.Teardown != nil {
-		StageCmdsExec(runCtx.ActCtx.Act.Teardown, runCtx.ActCtx, wg)
+func cleanup() {
+	utils.LogDebug("cleanup")
+
+	if runCtx != nil && runCtx.ActCtx != nil {
+		stack := runCtx.ActCtxCallStack
+
+		utils.LogDebug("cleanup : stack size", len(stack))
+
+		/**
+		 * The last context in the stack is the active one so we start
+		 * from it and go back through active contexts.
+		 */
+		for i := len(stack)-1; i >= 0; i-- {
+			ctx := stack[i]
+			utils.LogDebug("cleanup : running final steps", ctx.Act.Name)
+			ctx.FinalStageExec()
+	 	}
 	}
+
+	// Now that we are done lets clean
+	runCtx.Info.RmDataDir()
 }
 
 //############################################################
@@ -271,6 +294,9 @@ func Exec(args []string) {
 
 	// Build run context
 	runCtx = createRunCtx(cmdArgs, actFile)
+
+	// Set state as running
+	runCtx.State = ExecStateRunning
 
 	// Set quiet logs from command line
 	runCtx.Quiet = *quietPtr
@@ -333,40 +359,95 @@ func Exec(args []string) {
 		// Now run the matched act
 		runCtx.ActCtx.Exec()
 
-		if !cleaning {
-			// Teardown
-			wg := &sync.WaitGroup{}
-			teardown(wg)
-			wg.Wait()
+		utils.LogDebug("Exec : done")
 
-			// Now that we are done lets clean
-			runCtx.Info.RmDataDir()
+		/**
+		 * Let's run final commands only when exec finished naturally
+		 * (i.e., not killed). In this scenario the execution going to
+		 * be still running.
+		 */
+		/*if runCtx.State != ExecStateStopped {
+			utils.LogDebug("Exec : cleanup call")
+			cleanup()
+		}*/
+	}
+}
+
+/**
+ * This function going to stop execution of current running
+ * commands.
+ */
+func Stop() {
+	utils.LogDebug(fmt.Sprintf("Stop [State=%s]", runCtx.State))
+
+	/**
+	 * Stop only if we are executing non final commands.
+	 */
+	if runCtx != nil && !runCtx.IsFinishing && runCtx.State == ExecStateRunning {
+		/**
+		 * If we have a running act let's kill it and all it's descendant
+		 * children (as part of killing the process group as a whole).
+		 */
+		if runCtx.ActCtx != nil {
+			// First we kill current running context.
+			runCtx.Info.KillChildren();
 		}
+
+		runCtx.State = ExecStateStopped
 	}
 }
 
 /**
  * This function going to cleanup everything for this command on exit.
  */
-func Cleanup() {
-	if cleaning {
+func Finish() {
+	utils.LogDebug(fmt.Sprintf("Finish [State=%d]", runCtx.State), runCtx.IsFinishing)
+
+	/**
+	 * In case user tries to kill this process twice we going to
+	 * prevent running final actions multiple times.
+	 */
+	if runCtx == nil || runCtx.IsFinishing {
 		return
 	}
 
-	cleaning = true
+	/**
+	 * If we called Finish at the end of main process (i.e. in main.go)
+	 * then everything went fine and user didn't kill the process.
+	 * This way we can skip this finish process because the final step
+	 * was already done in act run ctx exec function.
+	 */
+	if runCtx.State == ExecStateRunning {
+		/**
+		 * We call KillChildren because we might have some dangling
+		 * detached child acts running and we want to kill them.
+		 */
+		runCtx.Info.KillChildren();
+		runCtx.Info.RmDataDir()
+		return
+	}
+
+	/**
+	 * Since we are reusing the same run context to run finishing
+	 * commands we need to resume the run context first to allow
+	 * new execution.
+	 */
+	runCtx.State = ExecStateRunning
+
+	/**
+	 * Set the flag isFinishing to run context so we can propagate
+	 * this information down to the process tree.
+	 */
+	runCtx.IsFinishing = true
 
 	/**
 	 * If we have a running act let's kill it and all it's descendant
 	 * children (as part of killing the process group as a whole).
 	 */
-	if runCtx != nil && runCtx.ActCtx != nil {
-		runCtx.IsCleaning = true
+	if runCtx.ActCtx != nil {
+		utils.LogDebug("Finish : cleanup call")
 
 		// If act has teardown commands let's run them before exit.
-		wg := &sync.WaitGroup{}
-		teardown(wg)
-		wg.Wait()
-
-		runCtx.Info.Kill()
+		cleanup()
 	}
 }

@@ -65,6 +65,11 @@ type ActRunCtx struct {
 	Args []string
 
 	/**
+	 * Set of variables passed from parent acts.
+	 */
+	ParentVars map[string]string
+
+	/**
 	 * Act runtime vars.
 	 */
 	ActVars map[string]string
@@ -95,6 +100,55 @@ func (ctx *ActRunCtx) Print() {
 }
 
 /**
+ * This function get local variables.
+ */
+func (ctx *ActRunCtx) GetLocalVars() map[string]string {
+	vars := make(map[string]string)
+	envFileVars := make(map[string]string)
+	actEnvFileVars := make(map[string]string)
+
+	if ctx.ActFile.EnvFilePath != "" {
+		envFilePath := utils.ResolvePath(path.Dir(ctx.ActFile.LocationPath), ctx.ActFile.EnvFilePath)
+		envars, _ := godotenv.Read(envFilePath)
+		envFileVars = envars
+	}
+
+	if ctx.Act.EnvFilePath != "" {
+		envFilePath := utils.ResolvePath(path.Dir(ctx.ActFile.LocationPath), ctx.Act.EnvFilePath)
+		envars, _ := godotenv.Read(envFilePath)
+		actEnvFileVars = envars
+	}
+
+	utils.LogDebug(fmt.Sprintf("GetLocalVars [act=%s] : parent vars", ctx.Act.Name), ctx.ParentVars)
+	utils.LogDebug(fmt.Sprintf("GetLocalVars [act=%s] : global env file vars", ctx.Act.Name), envFileVars)
+	utils.LogDebug(fmt.Sprintf("GetLocalVars [act=%s] : act env file vars", ctx.Act.Name), actEnvFileVars)
+
+	varsMapList := []map[string]string{
+		// Variables passed from parent acts.
+		ctx.ParentVars,
+
+		// Load vars from files first.
+		envFileVars,
+
+		// Load vars from act level env file.
+		actEnvFileVars,
+
+		// Local vars has precedence over global vars.
+		ctx.Vars,
+	}
+
+	for _, varsMap := range varsMapList {
+		for key, val := range varsMap {
+			vars[key] = val
+		}
+	}
+
+	utils.LogDebug(fmt.Sprintf("GetLocalVars [act=%s] : final vars", ctx.Act.Name), vars)
+
+	return vars
+}
+
+/**
  * This function going to merge all variables altogether.
  */
 func (ctx *ActRunCtx) MergeVars() map[string]string {
@@ -103,14 +157,7 @@ func (ctx *ActRunCtx) MergeVars() map[string]string {
 	runtimeVars, _ := godotenv.Read(ctx.RunCtx.Info.GetEnvVarsFilePath())
 
 	// Get vars from file
-	envFileVars := make(map[string]string)
-
-	if ctx.ActFile.EnvFilePath != "" {
-		envFilePath := utils.ResolvePath(path.Dir(ctx.ActFile.LocationPath), ctx.ActFile.EnvFilePath)
-		envars, _ := godotenv.Read(envFilePath)
-		envFileVars = envars
-	}
-
+	localVars := ctx.GetLocalVars()
 	environVars := make(map[string]string)
 
 	// Iterate over environ vars
@@ -126,22 +173,19 @@ func (ctx *ActRunCtx) MergeVars() map[string]string {
 		// Variables from the enviornment going to be overriden.
 		environVars,
 
-		// Load vars from files first.
-		envFileVars,
-
 		// Global vars has precedence over vars loaded from file.
 		ctx.RunCtx.Vars,
 
-		// Local vars has precedence over global vars.
-		ctx.Vars,
-
-		// Runtime vars has precedence over local vars.
+		// Runtime vars over global ones.
 		runtimeVars,
 
-		// Act runtime global vars has precedence over all other vars.
+		// Local variables has precedence over global ones.
+		localVars,
+
+		// Act own runtime vars has precedence over all other vars.
 		ctx.RunCtx.ActVars,
 
-		// Act runtime local vars has precedence over all other vars.
+		// Act own vars at act ctx level has precedence over all other vars.
 		ctx.ActVars,
 
 		// Flag vars has precedence over all other vars.
@@ -270,11 +314,39 @@ func (ctx *ActRunCtx) ExecBeforeAll() {
 }
 
 /**
+ * This function going to run teardown commands of currently
+ * running act upon exit.
+ *
+ * @TODO: We need to run teardown cmds of all running acts.
+ */
+func (ctx *ActRunCtx) FinalStageExec() {
+	utils.LogDebug("FinalStageExec : starting", ctx.Act.Name)
+
+	if ctx.Act.Final != nil {
+		utils.LogDebug("FinalStageExec : final commands found", ctx.Act.Name)
+
+		StageCmdsExec(ctx.Act.Final, ctx)
+	} else if ctx.Act.Teardown != nil {
+		/**
+		 * @deprecated - Teardown is deprecated in favor of final stage.
+		 */
+		StageCmdsExec(ctx.Act.Teardown, ctx)
+	}
+
+	utils.LogDebug("FinalStageExec : end", ctx.Act.Name)
+}
+
+/**
  * This function going to execute an act.
  */
 func (ctx *ActRunCtx) Exec() {
+	// Add this to call stack.
+	ctx.RunCtx.ActCtxCallStack = append(ctx.RunCtx.ActCtxCallStack, ctx)
+
 	// First thing we execute all before acts not executed yet.
 	ctx.ExecBeforeAll()
+
+	utils.LogDebug(fmt.Sprintf("Act Exec [act=%s]", ctx.Act.Name), ctx.Act.Flags, ctx.Args)
 
 	/**
 	 * We allow user to specify command line flags for acts. This
@@ -305,7 +377,9 @@ func (ctx *ActRunCtx) Exec() {
 	 * ```
 	 */
 	if len(ctx.Act.Flags) > 0 {
-		flagSet := flag.NewFlagSet(ctx.Act.Name, flag.ExitOnError)
+		utils.LogDebug(fmt.Sprintf("Act Exec [act=%s] : has flags", ctx.Act.Name), ctx.Act.Flags)
+
+		flagSet := flag.NewFlagSet(ctx.Act.Name, flag.ContinueOnError)
 
 		flagVals := make(map[string]string)
 		boolPtrs := make(map[string]*bool)
@@ -323,8 +397,10 @@ func (ctx *ActRunCtx) Exec() {
 
 			if defaultVal == "true" || defaultVal == "false" {
 				boolVal := defaultVal == "true"
+				utils.LogDebug(fmt.Sprintf("Act Exec [act=%s] : bool flag", ctx.Act.Name), nameKey, boolVal)
 				boolPtrs[nameKey] = flagSet.Bool(name, boolVal, "")
 			} else {
+				utils.LogDebug(fmt.Sprintf("Act Exec [act=%s] : string flag", ctx.Act.Name), nameKey, defaultVal)
 				strPtrs[nameKey] = flagSet.String(name, defaultVal, "")
 			}
 		}
@@ -333,11 +409,24 @@ func (ctx *ActRunCtx) Exec() {
 		 * Parse the incoming args extracting defined flags if user
 		 * provided any.
 		 */
-		flagSet.Parse(ctx.Args)
+		if err := flagSet.Parse(ctx.Args); err != nil {
+			utils.LogDebug(fmt.Sprintf("Act Exec [act=%s] : flag parse error", ctx.Act.Name), err)
+
+			Stop()
+			Finish()
+
+			utils.FatalError()
+
+			return
+		}
 
 		for name, ptr := range boolPtrs {
+			utils.LogDebug(fmt.Sprintf("Act Exec [act=%s] : bool ptr", ctx.Act.Name), *ptr)
+
 			if *ptr {
 				flagVals[name] = "true"
+			} else {
+				flagVals[name] = "false"
 			}
 		}
 
@@ -348,28 +437,46 @@ func (ctx *ActRunCtx) Exec() {
 		// Set cli flags to act ctx.
 		ctx.FlagVals = flagVals
 		ctx.Args = flagSet.Args()
+
+		utils.LogDebug(fmt.Sprintf("Act Exec [act=%s] : flags", ctx.Act.Name), ctx.FlagVals)
 	}
 
 	// If Act does not have an act stage lets return (do nothing)
 	if ctx.Act.Start == nil {
 		return
 	}
-
-	// Go over each command and execute them in sequence or in parallel.
-	wg := sync.WaitGroup{}
-
-	if ctx.Act.Start.Parallel {
-		wg.Add(len(ctx.Act.Start.Cmds))
+	
+	// First we execute before stage if present
+	if ctx.Act.Before != nil {
+		StageCmdsExec(ctx.Act.Before, ctx)
 	}
 
-	// Execute all act start commands
-	StageCmdsExec(ctx.Act.Start, ctx, &wg)
+	/**
+	 * Execute start commands now.
+	 */
+	StageCmdsExec(ctx.Act.Start, ctx)
 
 	/**
-	 * Wait all commands to finish because acts going to run
-	 * sequentially.
+	 * Run final commands.
 	 */
-	wg.Wait()
+	if ctx.RunCtx.State != ExecStateStopped {
+		utils.LogDebug("Act.Exec : final stage call")
+
+		/**
+		 * If we are finishing the last active act context, then we are going
+		 * to release all detached child acts we are still running.
+		 */
+		if len(ctx.RunCtx.ActCtxCallStack) == 1 {
+			ctx.RunCtx.Info.KillChildActs()
+		}
+
+		// Now we run final stage.
+		ctx.FinalStageExec()
+
+		// Remove this from call stack
+		lastIdx := len(ctx.RunCtx.ActCtxCallStack) - 1
+		ctx.RunCtx.ActCtxCallStack = ctx.RunCtx.ActCtxCallStack[:lastIdx]
+	}
 }
 
 //############################################################
@@ -404,6 +511,15 @@ func FindActCtx(
 	 */
 	var acts []*actfile.Act
 	var actFileLocationPath string
+	parentVars := make(map[string]string)
+
+	/**
+	 * @TODO : As parent vars we probably want both envFileVars and
+	 * vars defined at act level as well.
+	 */
+	if prevCtx != nil {
+		parentVars = prevCtx.GetLocalVars()
+	}
 
 	if prevCtx != nil && prevCtx.Act != nil && len(prevCtx.Act.Acts) > 0 {
 		acts = prevCtx.Act.Acts
@@ -445,12 +561,13 @@ func FindActCtx(
 		 * and start filling it out.
 		 */
 		ctx := ActRunCtx{
-			Act:     act,
-			ActFile: actFile,
-			PrevCtx: prevCtx,
-			Vars:    make(map[string]string),
-			ActVars: make(map[string]string),
-			RunCtx:  runCtx,
+			Act:     		act,
+			ActFile: 		actFile,
+			PrevCtx: 		prevCtx,
+			ParentVars: parentVars,
+			Vars:    		make(map[string]string),
+			ActVars: 		make(map[string]string),
+			RunCtx:  		runCtx,
 		}
 
 		// Act vars has precedence

@@ -112,6 +112,26 @@ type Info struct {
 }
 
 //############################################################
+// Internal Functions
+//############################################################
+/**
+ * This function going to check if process is up and running.
+ */
+func isProcessRunning(pid int) bool {
+	process, err := os.FindProcess(int(pid))
+
+	if err == nil {
+		err := process.Signal(syscall.Signal(0))
+
+		if err == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+//############################################################
 // Info Struct Functions
 //############################################################
 /**
@@ -155,7 +175,10 @@ func (info *Info) RmChildActId(id string) {
 	}
 
 	if idx >= 0 {
-		info.ChildActIds = append(info.ChildActIds[:idx], info.ChildActIds[idx+1:]...)
+		childActIds := make([]string, len(info.ChildActIds))
+		copy(childActIds, info.ChildActIds)
+
+		info.ChildActIds = append(childActIds[:idx], childActIds[idx+1:]...)
 		info.Save()
 	}
 
@@ -203,7 +226,14 @@ func (info *Info) RmCmdPgid(pgid int) {
 	}
 
 	if idx >= 0 {
-		info.CmdPgids = append(info.CmdPgids[:idx], info.CmdPgids[idx+1:]...)
+		/**
+		 * First we copy the original cmdPgids because the slice index
+		 * operation going to mess up with original info.CmdPgids.
+		 */
+		cmdPgids := make([]int, len(info.CmdPgids))
+		copy(cmdPgids, info.CmdPgids)
+
+		info.CmdPgids = append(cmdPgids[:idx], cmdPgids[idx+1:]...)
 		info.Save()
 	}
 
@@ -282,41 +312,85 @@ func (info *Info) RmDataDir() {
 }
 
 /**
- * This function going to quit a running process associated
- * with this specific info.
+ * This function going to kill only the running child commands.
  */
-func (info *Info) Kill() {
+func (info *Info) KillChildCmds() {
+	cmdPgids := make([]int, len(info.CmdPgids))
+	copy(cmdPgids, info.CmdPgids)
+
+	utils.LogDebug(fmt.Sprintf("KillChildCmds [id=%s] [num_cmds=%d]", info.Id, len(cmdPgids)))
+
+	// Kill all running commands.
+	for _, pgid := range cmdPgids {
+		utils.LogDebug(fmt.Sprintf("KillChildCmds [id=%s] : kill command %d", info.Id, pgid))
+
+		if pgid < 0 {
+			continue
+		}
+
+		if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
+			utils.LogDebug(fmt.Sprintf("could not kill command with process pgid=%d\n", pgid), err)
+		} else {
+			info.RmCmdPgid(pgid)
+		}
+	}
+}
+
+/**
+ * This function going to kill only the running child detached acts.
+ */
+func (info *Info) KillChildActs() {
 	/**
 	 * To prevent child acts killing this process we going to add a
 	 * fake pgid to running pgids.
 	 */
 	info.SetIsKilling()
 
+	utils.LogDebug(fmt.Sprintf("KillChildActs [id=%s] [num_childs=%d]", info.Id, len(info.ChildActIds)))
+
 	/**
 	 * Kill all child acts.
 	 */
-	if len(info.ChildActIds) > 0 {
+	 if len(info.ChildActIds) > 0 {
 		for _, childId := range info.ChildActIds {
 			childInfo := GetInfo(childId)
 
 			if childInfo != nil {
+				utils.LogDebug(fmt.Sprintf("KillChildActs [id=%s] : kill child %s", info.Id, childId))
+
 				childInfo.Kill()
 			}
 		}
 	}
+}
 
-	// Kill all running commands.
-	for _, pgid := range info.CmdPgids {
-		if pgid < 0 {
-			continue
-		}
+/**
+ * This function going to kill all children processes associated
+ * with this info.
+ */
+func (info *Info) KillChildren() {
+	utils.LogDebug(fmt.Sprintf("KillChildren [id=%s]", info.Id))
 
-		if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
-			utils.FatalError(fmt.Sprintf("could not kill command with process pgid=%d", pgid), err)
-		}
-	}
+	info.KillChildActs()
+	info.KillChildCmds()
+}
 
-	// Remove data dir
+/**
+ * This function going to quit a running process associated
+ * with this specific info.
+ */
+func (info *Info) Kill() {
+	utils.LogDebug(fmt.Sprintf("Kill [id=%s]", info.Id))
+
+	info.KillChildren()
+
+	/**
+	 * Remove data dir.
+	 *
+	 * @QUESTION : Is it possible to run into a race condition when
+	 * removing data dir? Because this is also being done in cleanup
+	 * function we have in run/run.go.
+	 */
 	info.RmDataDir()
 
 	// Print
@@ -324,6 +398,8 @@ func (info *Info) Kill() {
 
 	// Kill parent if needed
 	if info.ParentActId != "" {
+		utils.LogDebug("Kill : has parent", info.Id, info.ParentActId)
+
 		parentInfo := GetInfo(info.ParentActId)
 
 		if parentInfo != nil && !parentInfo.IsKilling {
@@ -335,6 +411,7 @@ func (info *Info) Kill() {
 				return
 			}
 
+			utils.LogDebug("Kill : killing parent", info.Id, info.ParentActId)
 			parentInfo.Kill()
 		}
 	}
