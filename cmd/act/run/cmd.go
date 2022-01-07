@@ -333,12 +333,18 @@ func CmdExec(cmd *actfile.Cmd, ctx *ActRunCtx, wg *sync.WaitGroup) {
 	if cmd.Script != "" {
 		cmdLine = utils.CompileTemplate(cmd.Script, vars)
 
-		shArgs = append([]string{cmdLine}, ctx.Args...)
+		var cmdArgs []string
+
+		for _, arg := range cmd.Args {
+			compiledArg := utils.CompileTemplate(arg, vars)
+			cmdArgs = append(cmdArgs, compiledArg)
+		}
+
+		shArgs = append([]string{cmdLine}, cmdArgs...)
 	} else {
 		cmdLine = utils.CompileTemplate(cmd.Cmd, vars)
 
 		shArgs = []string{"-c", cmdLine, "--"}
-		shArgs = append(shArgs, ctx.Args...)
 	}
 
 	// Set shell to use in the right precedence order.

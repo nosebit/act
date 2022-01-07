@@ -7,6 +7,7 @@
 package actfile
 
 import (
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -230,6 +231,20 @@ func (cmd *Cmd) UnmarshalYAML(value *yaml.Node) error {
 
 			cmd.Act = actCallId
 			cmd.Args = append(cmd.Args, actArgs...)
+		}
+
+		// We let user pass command args together with script.
+		if cmdObj.Script != "" {
+			// Trim whitespaces from template strings
+			var re = regexp.MustCompile(`{{ *([^ ]+) *}}`)
+			scriptLine := re.ReplaceAllString(cmdObj.Script, "{{$1}}")
+
+			args := strings.Split(scriptLine, " ")
+			scriptPath := args[0]
+			scriptArgs := args[1:]
+
+			cmd.Script = scriptPath
+			cmd.Args = append(cmd.Args, scriptArgs...)
 		}
 
 		return nil

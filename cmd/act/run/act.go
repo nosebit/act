@@ -198,6 +198,9 @@ func (ctx *ActRunCtx) MergeVars() map[string]string {
 		}
 	}
 
+	// Add the set of all command line arguments as a single var
+	vars["CliArgs"] = strings.Join(ctx.Args, " ")
+
 	return vars
 }
 
