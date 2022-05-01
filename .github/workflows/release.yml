@@ -45,9 +45,9 @@ jobs:
         with:
           go-version: '^1.16.5'
       - name: build act binary
-        run: GOOS=linux GOARCH=amd64 go build -ldflags="-X 'github.com/nosebit/act/cmd/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd/act/cmd.BinOS=linux' -X 'github.com/nosebit/act/cmd/act/cmd.BinArch=amd64' -X 'github.com/nosebit/act/cmd/act/cmd.BinBuildTime=$(date +%Y-%m-%d.%H:%M:%S)'" github.com/nosebit/act/cmd/act
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -ldflags="-X 'github.com/nosebit/act/cmd/act/cmd.BinVersion=v$(cat version)' -X 'github.com/nosebit/act/cmd/act/cmd.BinOS=linux' -X 'github.com/nosebit/act/cmd/act/cmd.BinArch=amd64' -X 'github.com/nosebit/act/cmd/act/cmd.BinBuildTime=$(date +%Y-%m-%d.%H:%M:%S)'" github.com/nosebit/act/cmd/act
       - name: build actr binary
-        run: GOOS=linux GOARCH=amd64 go build github.com/nosebit/act/cmd/actr
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a github.com/nosebit/act/cmd/actr
       - name: compress release folder
         run: tar -czvf act-$(cat version)-linux-amd64.tar.gz ./act ./actr
       - name: upload release artifact
